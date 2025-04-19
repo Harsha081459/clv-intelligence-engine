@@ -1,0 +1,478 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+.container { padding: 1.5rem 0; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.tab { padding: 6px 14px; border-radius: 20px; border: 0.5px solid var(--color-border-secondary); font-size: 13px; cursor: pointer; background: var(--color-background-primary); color: var(--color-text-secondary); transition: all 0.15s; }
+.tab:hover { background: var(--color-background-secondary); }
+.tab.active { background: #EEEDFE; border-color: #AFA9EC; color: #3C3489; font-weight: 500; }
+.section { display: none; }
+.section.active { display: block; }
+.proj-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.proj-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; cursor: pointer; transition: border-color 0.15s; }
+.proj-card:hover { border-color: var(--color-border-secondary); }
+.proj-card.best { border: 2px solid #AFA9EC; }
+.rank-badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px; margin-bottom: 8px; }
+.r1 { background: #EEEDFE; color: #3C3489; }
+.r2 { background: #E1F5EE; color: #085041; }
+.r3 { background: #FAEEDA; color: #633806; }
+.r4 { background: #FAECE7; color: #4A1B0C; }
+.r5 { background: #FBEAF0; color: #4B1528; }
+.proj-title { font-size: 15px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 4px; }
+.proj-sub { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; }
+.diff { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-top: 8px; }
+.hard { background: #FCEBEB; color: #791F1F; }
+.med { background: #FAEEDA; color: #633806; }
+.detail-view { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem; }
+.detail-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px; }
+.detail-title { font-size: 18px; font-weight: 500; color: var(--color-text-primary); }
+.detail-resume { font-size: 13px; color: var(--color-text-secondary); margin-top: 4px; font-style: italic; }
+.back-btn { font-size: 13px; color: var(--color-text-secondary); cursor: pointer; border: 0.5px solid var(--color-border-secondary); padding: 5px 12px; border-radius: 20px; background: var(--color-background-primary); }
+.back-btn:hover { background: var(--color-background-secondary); }
+.section-label { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-secondary); margin: 1.25rem 0 0.5rem; }
+.pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.5rem; }
+.pill { font-size: 12px; padding: 3px 10px; border-radius: 20px; background: var(--color-background-secondary); color: var(--color-text-primary); border: 0.5px solid var(--color-border-tertiary); }
+.pill.purple { background: #EEEDFE; color: #3C3489; }
+.pill.teal { background: #E1F5EE; color: #085041; }
+.pill.amber { background: #FAEEDA; color: #633806; }
+.pill.coral { background: #FAECE7; color: #4A1B0C; }
+.pill.blue { background: #E6F1FB; color: #0C447C; }
+.prose { font-size: 14px; color: var(--color-text-secondary); line-height: 1.7; }
+.step-list { list-style: none; counter-reset: steps; }
+.step-list li { counter-increment: steps; display: flex; gap: 10px; margin-bottom: 10px; font-size: 14px; color: var(--color-text-secondary); line-height: 1.6; }
+.step-list li::before { content: counter(steps); min-width: 22px; height: 22px; border-radius: 50%; background: #EEEDFE; color: #3C3489; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.bullet-box { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; margin: 6px 0; font-size: 13px; color: var(--color-text-primary); border-left: 3px solid #AFA9EC; line-height: 1.6; }
+.arch-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 0.5rem 0; }
+.arch-box { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 8px 10px; text-align: center; font-size: 12px; color: var(--color-text-primary); }
+.arch-box .icon { font-size: 18px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.interview-q { border-left: 2px solid #1D9E75; padding: 8px 12px; margin: 8px 0; background: #E1F5EE; border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0; font-size: 13px; color: #085041; line-height: 1.6; }
+.ask-btn { margin-top: 1.5rem; padding: 8px 18px; font-size: 14px; border-radius: 20px; border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; }
+.ask-btn:hover { background: var(--color-background-secondary); }
+</style>
+
+<h2 class="sr-only">Classical ML project guide for DSAI internship resume — 5 ranked project ideas with full implementation details</h2>
+
+<div class="container">
+<div class="tabs" id="tabs">
+  <div class="tab active" onclick="showTab('overview')">Project rankings</div>
+  <div class="tab" onclick="showTab('concepts')">ML concepts covered</div>
+  <div class="tab" onclick="showTab('timeline')">6-week plan</div>
+  <div class="tab" onclick="showTab('readme')">GitHub README</div>
+</div>
+
+<div id="overview" class="section active">
+  <div id="proj-list">
+    <div class="proj-grid">
+      <div class="proj-card best" onclick="showDetail(0)">
+        <div class="rank-badge r1">🥇 Rank 1 — Best pick</div>
+        <div class="proj-title">Credit Risk Scorecard with Business Impact Engine</div>
+        <div class="proj-sub">End-to-end loan default prediction system with WoE/IV feature engineering, calibrated scorecard, and a P&L simulation dashboard</div>
+        <div class="diff hard">Advanced</div>
+      </div>
+      <div class="proj-card" onclick="showDetail(1)">
+        <div class="rank-badge r2">🥈 Rank 2</div>
+        <div class="proj-title">Real-Time Fraud Detection System</div>
+        <div class="proj-sub">Transaction fraud classifier with extreme imbalance handling, threshold optimization, and a live scoring API</div>
+        <div class="diff hard">Advanced</div>
+      </div>
+      <div class="proj-card" onclick="showDetail(2)">
+        <div class="rank-badge r3">🥉 Rank 3</div>
+        <div class="proj-title">Insurance Claim Severity & Fraud Triage</div>
+        <div class="proj-sub">Dual-model pipeline: binary fraud flag + severity regression, with claim prioritization queue and SHAP reason codes</div>
+        <div class="diff med">Intermediate–Advanced</div>
+      </div>
+      <div class="proj-card" onclick="showDetail(3)">
+        <div class="rank-badge r4">4th</div>
+        <div class="proj-title">Customer LTV & Churn Risk Platform</div>
+        <div class="proj-sub">Multi-target model combining churn probability and predicted revenue with cohort-level business retention simulation</div>
+        <div class="diff med">Intermediate–Advanced</div>
+      </div>
+      <div class="proj-card" onclick="showDetail(4)">
+        <div class="rank-badge r5">5th</div>
+        <div class="proj-title">Hospital Readmission Risk Stratifier</div>
+        <div class="proj-sub">30-day readmission classifier on MIMIC/Diabetes-130 with fairness audit, cost-sensitive triage, and clinical risk tiers</div>
+        <div class="diff med">Intermediate–Advanced</div>
+      </div>
+    </div>
+    <div style="margin-top: 1rem; font-size: 13px; color: var(--color-text-secondary);">Click any project to see the full implementation guide →</div>
+  </div>
+  <div id="detail-view" style="display:none;"></div>
+</div>
+
+<div id="concepts" class="section">
+  <div class="detail-view">
+    <p class="prose" style="margin-bottom:1rem;">Every project in this guide forces you to implement all of the following. This is what separates a resume-worthy project from a tutorial clone.</p>
+    <div class="section-label">Core algorithms</div>
+    <div class="pill-row">
+      <span class="pill purple">Logistic Regression + L1/L2 regularization</span>
+      <span class="pill purple">Random Forest with OOB estimation</span>
+      <span class="pill purple">XGBoost with early stopping</span>
+      <span class="pill purple">LightGBM for speed benchmarking</span>
+      <span class="pill purple">CatBoost for high-cardinality categoricals</span>
+    </div>
+    <div class="section-label">Feature engineering (the hard part)</div>
+    <div class="pill-row">
+      <span class="pill teal">WoE / IV (Weight of Evidence)</span>
+      <span class="pill teal">Target encoding with leave-one-out</span>
+      <span class="pill teal">Interaction features & polynomial terms</span>
+      <span class="pill teal">Temporal aggregations (rolling stats)</span>
+      <span class="pill teal">Frequency/count encoding</span>
+      <span class="pill teal">Binning & monotone transformations</span>
+    </div>
+    <div class="section-label">Imbalanced classification</div>
+    <div class="pill-row">
+      <span class="pill coral">SMOTE / ADASYN oversampling</span>
+      <span class="pill coral">Class-weight adjustment</span>
+      <span class="pill coral">scale_pos_weight in XGBoost</span>
+      <span class="pill coral">Undersampling + ensemble</span>
+    </div>
+    <div class="section-label">Model evaluation (beyond accuracy)</div>
+    <div class="pill-row">
+      <span class="pill amber">ROC-AUC</span>
+      <span class="pill amber">PR-AUC (Precision-Recall)</span>
+      <span class="pill amber">KS statistic</span>
+      <span class="pill amber">Gini coefficient</span>
+      <span class="pill amber">F1 / F-beta score</span>
+      <span class="pill amber">Calibration curve + Brier score</span>
+      <span class="pill amber">Confusion matrix at optimal threshold</span>
+    </div>
+    <div class="section-label">Explainability</div>
+    <div class="pill-row">
+      <span class="pill blue">SHAP values (TreeExplainer)</span>
+      <span class="pill blue">SHAP summary / waterfall / force plots</span>
+      <span class="pill blue">Permutation importance</span>
+      <span class="pill blue">LIME for individual predictions</span>
+      <span class="pill blue">Reason codes per prediction</span>
+    </div>
+    <div class="section-label">Production-grade additions</div>
+    <div class="pill-row">
+      <span class="pill">Threshold tuning (cost matrix)</span>
+      <span class="pill">Platt scaling / isotonic calibration</span>
+      <span class="pill">Business P&L / cost-benefit simulation</span>
+      <span class="pill">Evidently AI for data drift monitoring</span>
+      <span class="pill">MLflow experiment tracking</span>
+      <span class="pill">FastAPI /predict endpoint</span>
+      <span class="pill">Streamlit demo with SHAP explainer</span>
+    </div>
+  </div>
+</div>
+
+<div id="timeline" class="section">
+  <div class="detail-view">
+    <p class="prose" style="margin-bottom:1rem;">This plan works for any of the top-3 projects. Adjust dataset-specific steps accordingly.</p>
+    <div class="section-label">Week 1 — Data & EDA</div>
+    <ul class="step-list">
+      <li>Download dataset, audit schema, document every column</li>
+      <li>Exploratory data analysis: distributions, nulls, target rate, class imbalance ratio</li>
+      <li>Correlation heatmap, bivariate analysis vs target</li>
+      <li>Define train/val/test splits with temporal stratification if time-based</li>
+    </ul>
+    <div class="section-label">Week 2 — Feature engineering</div>
+    <ul class="step-list">
+      <li>Null imputation strategy per column (mean/median/mode/flag)</li>
+      <li>Categorical encoding: OHE for low-card, target encoding for high-card</li>
+      <li>WoE transformation for logistic regression scorecard</li>
+      <li>Feature interaction construction, polynomial terms</li>
+    </ul>
+    <div class="section-label">Week 3 — Modeling</div>
+    <ul class="step-list">
+      <li>Logistic Regression baseline with L1 regularization (feature selection signal)</li>
+      <li>Random Forest with OOB score, GridSearchCV on depth/n_estimators</li>
+      <li>XGBoost with Optuna hyperparameter search, early stopping</li>
+      <li>LightGBM for comparison, CatBoost if high-cardinality categoricals</li>
+    </ul>
+    <div class="section-label">Week 4 — Evaluation & explainability</div>
+    <ul class="step-list">
+      <li>Full evaluation suite: ROC, PR-AUC, KS, calibration curves</li>
+      <li>Threshold tuning using cost matrix (false negative cost >> false positive)</li>
+      <li>SHAP TreeExplainer: global summary plot + per-prediction waterfall</li>
+      <li>Generate top-5 reason codes per prediction in plain English</li>
+    </ul>
+    <div class="section-label">Week 5 — Deployment & demo</div>
+    <ul class="step-list">
+      <li>Serialize final model pipeline (joblib/pickle with sklearn Pipeline)</li>
+      <li>FastAPI /predict endpoint with Pydantic input validation</li>
+      <li>Streamlit demo: user inputs → risk score + SHAP waterfall + reason codes</li>
+      <li>Business simulation tab: adjust threshold, see P&L impact</li>
+    </ul>
+    <div class="section-label">Week 6 — Polish & documentation</div>
+    <ul class="step-list">
+      <li>MLflow experiment tracking: log all runs, params, metrics</li>
+      <li>Evidently AI report for data drift (compare train vs test distribution)</li>
+      <li>Write GitHub README with all sections (see README tab)</li>
+      <li>Record a 2-min Loom demo video, link in README</li>
+    </ul>
+  </div>
+</div>
+
+<div id="readme" class="section">
+  <div class="detail-view">
+    <p class="prose" style="margin-bottom:1rem;">Structure your README so a recruiter spending 90 seconds understands the project's depth immediately.</p>
+    <div class="arch-row">
+      <div class="arch-box"><div class="icon"><i class="ti ti-flag" aria-hidden="true"></i></div>Problem statement & business value</div>
+      <div class="arch-box"><div class="icon"><i class="ti ti-database" aria-hidden="true"></i></div>Dataset + EDA highlights</div>
+      <div class="arch-box"><div class="icon"><i class="ti ti-tools" aria-hidden="true"></i></div>Feature engineering summary</div>
+      <div class="arch-box"><div class="icon"><i class="ti ti-chart-bar" aria-hidden="true"></i></div>Model comparison table</div>
+    </div>
+    <div class="arch-row">
+      <div class="arch-box"><div class="icon"><i class="ti ti-eye" aria-hidden="true"></i></div>SHAP plots (inline images)</div>
+      <div class="arch-box"><div class="icon"><i class="ti ti-adjustments" aria-hidden="true"></i></div>Threshold tuning & business impact</div>
+      <div class="arch-box"><div class="icon"><i class="ti ti-rocket" aria-hidden="true"></i></div>Demo link + screenshots</div>
+      <div class="arch-box"><div class="icon"><i class="ti ti-list" aria-hidden="true"></i></div>How to run locally</div>
+    </div>
+    <div class="section-label">Key README sections (in order)</div>
+    <ul class="step-list">
+      <li>Banner: project title, 1-line description, live demo badge, tech stack badges</li>
+      <li>Business problem: 3 sentences on why this matters in industry</li>
+      <li>Dataset: source, size, class imbalance ratio, key features</li>
+      <li>Feature engineering: table of engineered features with descriptions</li>
+      <li>Model comparison: table of LR / RF / XGBoost / LGBM with ROC-AUC, PR-AUC, F1</li>
+      <li>Evaluation deep-dive: ROC curves image, calibration curve image, KS chart</li>
+      <li>Explainability: SHAP summary plot + example waterfall for 1 prediction</li>
+      <li>Threshold tuning: cost matrix assumptions, optimal threshold, P&L table</li>
+      <li>System architecture diagram (one image)</li>
+      <li>Demo screenshots / GIF</li>
+      <li>How to run: pip install -r requirements.txt, uvicorn app:app, streamlit run</li>
+    </ul>
+    <button class="ask-btn" onclick="sendPrompt('Can you write me a complete GitHub README template for the Credit Risk Scorecard project?')">Generate a full README template ↗</button>
+  </div>
+</div>
+</div>
+
+<script>
+const projects = [
+  {
+    title: "Credit Risk Scorecard with Business Impact Engine",
+    rank: "🥇 Rank 1 — Best for ML internship resumes",
+    rankClass: "r1",
+    resume: "Built an end-to-end loan default prediction system using WoE/IV feature engineering, XGBoost/LightGBM ensemble, calibrated probability scorecard, and a Streamlit P&L simulation dashboard; achieved 0.83 ROC-AUC on held-out test set.",
+    why: "Credit risk is the gold standard interview domain for data scientists at banks, fintechs, and consulting firms. WoE/IV is used in every real bank's scorecard model. Demonstrates you understand both the math AND the business. Most candidates can't explain WoE — you will.",
+    business: "Banks and lenders use credit scorecards to decide who gets a loan and at what rate. A 1% improvement in default prediction on a $1B loan book = tens of millions saved. This is the exact model that companies like HDFC, Bajaj Finance, Paytm, and CIBIL use.",
+    datasets: ["Home Credit Default Risk (Kaggle — 300K rows, 120 features)", "Give Me Some Credit (Kaggle — 150K rows, industry-standard benchmark)", "LendingClub Loan Data (Kaggle — 1M+ rows, rich features)"],
+    algorithms: ["Logistic Regression with WoE features as baseline scorecard", "Random Forest for nonlinear feature importance benchmarking", "XGBoost with scale_pos_weight for imbalance", "LightGBM for speed + GBDT comparison", "Optuna for hyperparameter search"],
+    featureEng: ["WoE encoding for all categorical variables (bins by default rate)", "IV (Information Value) for feature selection (IV < 0.02 = useless)", "Debt-to-income ratio, utilization rate, installment burden features", "Aggregated bureau features: max delinquency, number of open accounts", "Temporal: months since last delinquency, credit history length"],
+    imbalance: ["Class imbalance ~10:1 (90% non-default)", "scale_pos_weight in XGBoost", "class_weight='balanced' for LR and RF", "SMOTE on training set only (never on val/test)", "Evaluate on PR-AUC not ROC-AUC as primary metric"],
+    evaluation: ["ROC-AUC, PR-AUC as primary metrics", "KS statistic (industry standard for scorecards)", "Gini coefficient = 2×AUC - 1", "Calibration curve: predicted prob vs actual default rate by decile", "Population Stability Index (PSI) for train/test shift"],
+    explainability: ["SHAP TreeExplainer for XGBoost global + local", "Top-3 positive and negative SHAP features per prediction", "Reason codes: 'High debt-to-income ratio (+0.18 risk)', 'Short credit history (+0.12 risk)'", "SHAP dependence plots for top features", "Scorecard points table (logistic regression interpretable output)"],
+    deployment: ["Streamlit app: input form with 10-15 key loan/applicant features", "Output: Credit Score (300–900 scale), Risk tier (Low/Medium/High), Approval recommendation", "SHAP waterfall chart showing top reasons for decision", "Business simulation tab: adjust approval threshold → see expected default rate, revenue, and loss"],
+    advanced: ["Threshold tuning: define FN cost (missed default) vs FP cost (rejected good customer), find optimal threshold", "Platt scaling for probability calibration", "P&L simulator: expected revenue per approved loan minus expected loss given default", "PSI monitoring: flag if new batch differs from train distribution", "MLflow: log all experiments with params + metrics"],
+    architecture: ["Data ingestion → Preprocessing pipeline (sklearn Pipeline)", "Feature engineering module (WoE transformer, custom sklearn transformer)", "Model zoo: LR, RF, XGB, LGBM trained with cross-validation", "MLflow experiment tracker", "FastAPI /score endpoint (takes JSON, returns score + reason codes)", "Streamlit frontend → calls FastAPI"],
+    weeks: ["Week 1: EDA on Home Credit, document all 120 features, compute IV for each", "Week 2: Build WoE encoder as sklearn BaseTransformer, build feature pipeline", "Week 3: Train LR baseline, RF, XGBoost with Optuna, log to MLflow", "Week 4: Calibration analysis, threshold tuning with cost matrix, KS/PSI metrics", "Week 5: FastAPI endpoint + Streamlit demo with SHAP and business sim", "Week 6: README, drift monitoring with Evidently, Loom demo video"],
+    bullets: [
+      "Engineered 40+ features using Weight-of-Evidence (WoE) and Information Value (IV) on 300K loan applications; selected 22 predictive features via IV thresholding",
+      "Trained and compared LR, Random Forest, XGBoost, and LightGBM; achieved 0.83 ROC-AUC and 0.71 PR-AUC with calibrated XGBoost model",
+      "Implemented cost-sensitive threshold tuning using a business cost matrix, yielding 18% improvement in expected P&L vs default 0.5 threshold",
+      "Deployed end-to-end scoring API (FastAPI) + Streamlit dashboard with SHAP waterfall explanations and real-time P&L simulation"
+    ],
+    interview: [
+      "Why use WoE encoding instead of one-hot? — WoE captures monotone relationship with target, handles missing values naturally, and is required for logistic scorecard interpretability by Basel/IFRS regulations.",
+      "Why PR-AUC over ROC-AUC for imbalanced data? — ROC-AUC is optimistic under severe imbalance because it uses TN in the denominator. PR-AUC only uses positive class performance, giving a truer picture.",
+      "How did you tune the decision threshold? — Built a cost matrix: FN (missed default) costs ~$5,000 in loss; FP (rejected good customer) costs ~$200 in lost revenue. Sweep threshold, maximize expected value.",
+      "Explain SHAP in one minute — SHAP computes each feature's contribution to a prediction using Shapley values from cooperative game theory: how much does each feature change the model output vs the expected output?"
+    ]
+  },
+  {
+    title: "Real-Time Fraud Detection System",
+    rank: "🥈 Rank 2",
+    rankClass: "r2",
+    resume: "Designed a transaction fraud detection pipeline handling 0.17% fraud rate using SMOTE, XGBoost, and LightGBM; deployed a FastAPI scoring API with sub-100ms latency and SHAP-based alert explanations.",
+    why: "Fraud detection is one of the most common ML interview case studies at Razorpay, Paytm, Stripe, Amazon, and all major banks. Extreme imbalance (99.8% non-fraud) forces you to really understand evaluation beyond accuracy.",
+    business: "Payment processors lose $32B/year to fraud globally. A detector that catches 5% more fraud at the same false positive rate = millions in savings. Every fintech uses a version of this system.",
+    datasets: ["IEEE-CIS Fraud Detection (Kaggle — 590K transactions, 430 features)", "Credit Card Fraud Detection (Kaggle — 284K transactions, Kaggle classic)", "PaySim synthetic fraud dataset (GitHub)"],
+    algorithms: ["Logistic Regression on PCA-compressed features as baseline", "Isolation Forest as unsupervised anomaly baseline", "Random Forest with class_weight balanced", "XGBoost + LightGBM as primary models", "Stacked ensemble with LR meta-learner"],
+    featureEng: ["Transaction velocity features: txn count in last 1/6/24 hours per card", "Time-based features: hour of day, day of week, days since last txn", "Amount deviation: z-score vs cardholder's historical spend", "Merchant category frequency: how often does this card use this MCA", "Location mismatch flag: txn country != card home country"],
+    imbalance: ["0.17% fraud rate = ~580:1 imbalance", "scale_pos_weight = 580 in XGBoost", "ADASYN oversampling (adaptive SMOTE) on training folds only", "Undersampling majority + ensemble of weak classifiers", "Primary metric: PR-AUC and F2-score (recall-weighted F)"],
+    evaluation: ["PR-AUC as primary metric (ROC-AUC misleading at 0.17% base rate)", "F2-score (2×recall weighted — missing fraud is 2x worse than false alarm)", "Precision @ top-K alerts (can your ops team review K cases/day?)", "Dollar amount caught vs missed analysis", "Confusion matrix at multiple thresholds"],
+    explainability: ["SHAP values: 'Amount 8× user's average (+0.34)', 'Merchant first seen today (+0.21)'", "Rule extraction: top SHAP patterns that describe fraud cases", "LIME for individual suspicious transactions", "Alert card in dashboard: plain-English reason codes"],
+    deployment: ["Streamlit app: paste transaction JSON → get Fraud Probability + SHAP reasons", "FastAPI: /score endpoint, async inference, <100ms target", "Alert dashboard: table of high-risk transactions with drill-down", "Threshold slider: show precision/recall tradeoff in real time"],
+    advanced: ["Threshold optimization: Precision@Recall=0.80 (ops team can review N cases/day)", "Dollar-weighted evaluation: weight FN by transaction amount", "Concept drift: fraud patterns shift — monthly retraining flag if PSI > 0.2", "Feature store simulation: precompute velocity features per entity"],
+    architecture: ["Raw transaction stream → Feature engineering (velocity, deviation)", "sklearn Pipeline → XGBoost scorer", "FastAPI /score endpoint", "Alert queue (high-risk txns > threshold)", "Streamlit dashboard → fraud analyst view with SHAP"],
+    weeks: ["Week 1: EDA on IEEE-CIS dataset, understand 430 features, compute fraud rate by category", "Week 2: Velocity feature engineering (requires pandas groupby with time windows)", "Week 3: Baseline LR, RF, XGBoost, tune with Optuna on PR-AUC objective", "Week 4: Stacking ensemble, threshold optimization with dollar-cost matrix", "Week 5: FastAPI + Streamlit real-time demo with SHAP alert cards", "Week 6: Drift monitoring, MLflow, README and demo video"],
+    bullets: [
+      "Engineered 25+ transaction velocity and behavioral deviation features on 590K transactions to capture fraud signals beyond raw transaction attributes",
+      "Addressed 580:1 class imbalance using ADASYN oversampling and scale_pos_weight; optimized XGBoost on PR-AUC achieving 0.89 vs 0.43 baseline",
+      "Built a dollar-weighted cost matrix for threshold selection, recovering 23% more fraud value vs default threshold with the same false positive budget",
+      "Deployed real-time scoring API (FastAPI, <100ms) with SHAP-based plain-English alert explanations for fraud analyst review"
+    ],
+    interview: [
+      "Why PR-AUC and not ROC-AUC for fraud? — At 0.17% base rate, a model predicting all non-fraud gets ROC-AUC ~0.96. PR-AUC penalizes this correctly because it never considers true negatives.",
+      "How do you set the fraud threshold in practice? — Fraud teams have a fixed review capacity (N cases/day). Set threshold so top-N scored transactions are queued. Then optimize precision within that N.",
+      "What's the problem with SMOTE on fraud data? — SMOTE creates synthetic minority samples by interpolating between existing minority points. If fraud cases aren't clustered in feature space, it generates unrealistic samples. ADASYN is adaptive; consider it in high-dimensional feature spaces.",
+      "How would you handle concept drift in fraud? — Monitor PSI and feature distributions monthly. Retrain when PSI > 0.2 on key velocity features. Use a champion-challenger setup in production."
+    ]
+  },
+  {
+    title: "Insurance Claim Severity & Fraud Triage",
+    rank: "🥉 Rank 3",
+    rankClass: "r3",
+    resume: "Developed a dual-model insurance pipeline combining binary fraud classification (XGBoost, 0.87 ROC-AUC) and severity regression (LightGBM) for claim amount estimation; built a claim prioritization queue with SHAP reason codes.",
+    why: "Dual-objective modeling (classification + regression together) is rare in beginner projects. Demonstrates you can think in terms of business workflows, not just single-model tasks.",
+    business: "Insurance companies receive thousands of claims daily. They need to (a) flag potential fraud for investigation and (b) estimate claim severity to reserve funds. This 2-model system is used by every major insurer.",
+    datasets: ["Porto Seguro Safe Driver Prediction (Kaggle — 600K rows)", "AllState Claims Severity (Kaggle — regression target)", "Insurance Fraud Detection (Kaggle — synthetic but structured)"],
+    algorithms: ["Logistic Regression baseline for fraud flag", "Random Forest for fraud classification", "XGBoost for fraud (primary)", "LightGBM for severity regression", "Stacked: fraud probability as input feature to severity model"],
+    featureEng: ["Claim frequency per policyholder (past 12 months)", "Policy age at claim, claim-to-premium ratio", "Days between incident and claim filing (fraud signal)", "Vehicle age × driver age interaction", "Geographic risk zone encoding"],
+    imbalance: ["Fraud ~8% in insurance data", "class_weight='balanced' for all classifiers", "Stratified K-fold cross-validation", "F1 and PR-AUC as primary metrics"],
+    evaluation: ["Fraud model: ROC-AUC, PR-AUC, F1 at optimal threshold", "Severity model: RMSE, MAE, MAPE, R²", "Combined metric: Expected recovery = True Fraud × Mean Severity", "Lift chart: how much better than random triage?"],
+    explainability: ["SHAP for fraud model: 'Claim filed 1 day after policy start (+0.31)'", "SHAP for severity: 'Vehicle age 15 years (+$2,400 predicted severity)'", "Claim card: fraud risk + severity estimate + top-3 risk factors", "Adjustor dashboard: sortable queue by fraud probability × severity"],
+    deployment: ["Streamlit claim intake form: enter claim details → get fraud score + severity estimate + priority tier", "Priority queue: High/Medium/Low based on fraud prob × severity", "SHAP waterfall per claim", "Batch scoring tab: upload CSV of claims → download scored file"],
+    advanced: ["Joint optimization: maximize expected saved fraud amount (fraud_prob × severity)", "Fairness audit: check if fraud flag rate differs by region/vehicle type", "Batch pipeline: process 1000 claims/day workflow", "Calibration for fraud probability (required for reserving calculations)"],
+    architecture: ["Claim intake → Feature engineering pipeline", "Model 1: Fraud classifier (XGBoost)", "Model 2: Severity regressor (LightGBM)", "Combined score: priority tier assignment", "Streamlit triage dashboard"],
+    weeks: ["Week 1: EDA on AllState + Porto Seguro, understand claim structure", "Week 2: Feature engineering — temporal, ratio, interaction features", "Week 3: Train fraud model (XGBoost) + severity model (LightGBM) separately", "Week 4: Build combined scoring logic, calibrate fraud model, evaluate jointly", "Week 5: Streamlit triage dashboard + batch scoring pipeline", "Week 6: README, SHAP visualizations, drift monitoring"],
+    bullets: [
+      "Built a dual-model insurance claim pipeline: XGBoost fraud classifier (0.87 ROC-AUC) and LightGBM severity regressor (RMSE $1,240) jointly optimized on expected fraud recovery value",
+      "Engineered 18 domain features including claim-to-premium ratio, filing delay, and policyholder claim frequency as primary fraud signals",
+      "Designed a priority triage queue (fraud_probability × severity) surfacing the highest-value fraudulent claims to adjustors first",
+      "Deployed Streamlit dashboard with per-claim SHAP reason codes and batch scoring pipeline processing 1,000 claims/run"
+    ],
+    interview: [
+      "Why not just use one model for everything? — Fraud and severity have different target distributions and different cost structures. Decoupling them lets each model specialize. The combined business metric (expected recovery = fraud_prob × severity) can be computed post-hoc.",
+      "How did you handle the regression target for severity? — Log-transform the claim amount (right-skewed). Use RMSLE as objective. Back-transform predictions for business reporting.",
+      "What's the cost of a false negative in fraud vs severity? — In fraud: FN means a fraudulent claim is paid, direct loss of claim amount. In severity: under-prediction means under-reserving, which is a regulatory and solvency risk.",
+      "How would you make this fair across geographies? — Run the fraud model separately per risk zone, compare FPR across zones. If rural policyholders are flagged at 3× the rate of urban with similar profiles, that's a disparate impact problem."
+    ]
+  },
+  {
+    title: "Customer LTV & Churn Risk Platform",
+    rank: "4th place",
+    rankClass: "r4",
+    resume: "Built a multi-target customer analytics platform predicting 90-day churn probability and 12-month LTV using XGBoost and regression stacking; deployed cohort-level retention ROI simulator.",
+    why: "Multi-target modeling separates you from single-model projects. Every SaaS, e-commerce, and telecom company runs this exact analysis. LTV + churn together is more realistic than churn alone.",
+    business: "Retention teams at Swiggy, Nykaa, and Airtel use models like this to decide who to target with discounts. Targeting high-LTV customers at risk of churn with the right incentive = maximized retention ROI.",
+    datasets: ["Telco Customer Churn (Kaggle — 7K rows, classic but extendable)", "E-commerce customer data (Kaggle)", "Olist Brazilian E-Commerce (Kaggle — build RFM features from raw transactions)"],
+    algorithms: ["Logistic Regression for churn baseline", "Random Forest for churn + importance ranking", "XGBoost for churn (primary classifier)", "LightGBM for LTV regression", "Meta-learner: use churn probability as LTV model feature"],
+    featureEng: ["RFM features: Recency (days since last purchase), Frequency (orders/year), Monetary (total spend)", "Tenure buckets × product category cross-features", "Support ticket count, CSAT score as churn signals", "MoM and QoQ spend trajectory (growing vs declining customer)", "Cohort age: months since first purchase"],
+    imbalance: ["Churn rate varies 5–35% by dataset", "class_weight='balanced' + scale_pos_weight", "Stratified K-fold mandatory for temporal data"],
+    evaluation: ["Churn: ROC-AUC, PR-AUC, F1, calibration curve", "LTV: RMSE, MAE, R², Spearman rank correlation", "Combined: Retention ROI = (LTV × churn_prob × retention_rate_of_intervention) - intervention_cost"],
+    explainability: ["SHAP: 'No purchases in 60 days (+0.29 churn)', 'Declined spend last quarter (+0.18)'", "Customer card: churn risk tier + predicted LTV + top risk factors", "Cohort-level SHAP aggregation: which features drive churn in each customer segment"],
+    deployment: ["Streamlit: enter customer RFM profile → churn probability + LTV + intervention recommendation", "Cohort simulator: define intervention budget → model finds optimal targeting threshold", "Segment explorer: scatter plot of LTV vs churn risk, click customer for detail"],
+    advanced: ["Retention ROI optimization: maximize (saved LTV) - (intervention cost) across budget", "Customer segmentation: K-Means on RFM → segment-specific models", "Survival analysis: time-to-churn with Kaplan-Meier curves"],
+    architecture: ["Transaction history → RFM feature pipeline", "Model 1: Churn classifier (XGBoost)", "Model 2: LTV regressor (LightGBM)", "Business layer: ROI calculator", "Streamlit dashboard + cohort explorer"],
+    weeks: ["Week 1: Build RFM features from raw transaction data (requires pandas time-series operations)", "Week 2: Feature engineering + encoding pipeline", "Week 3: Train churn + LTV models with cross-validation", "Week 4: Calibration, threshold tuning for retention ROI objective", "Week 5: Streamlit cohort simulator + customer detail view", "Week 6: README + optional survival analysis extension"],
+    bullets: [
+      "Engineered 30+ RFM and behavioral features from raw transaction logs to capture customer lifecycle stage and churn risk signals",
+      "Built dual-target system: XGBoost churn classifier (0.81 ROC-AUC) + LightGBM LTV regressor (R²=0.74), using churn probability as meta-feature for LTV",
+      "Implemented retention ROI optimizer identifying top-N at-risk high-LTV customers to maximize return on a fixed intervention budget",
+      "Deployed Streamlit cohort explorer with SHAP-driven customer cards and budget simulation for retention campaign planning"
+    ],
+    interview: [
+      "How is this different from a simple churn model? — We jointly optimize churn + LTV. A customer with 90% churn probability but $10 LTV deserves no intervention. A customer with 60% churn probability and $2,000 LTV deserves a $100 discount. The ROI framework makes the decision.",
+      "Why use LTV as a regression problem rather than binning? — Binning loses information. The difference between $100 and $1,000 LTV customers matters for budget allocation. Regression preserves this ordinal signal.",
+      "How would you validate the LTV model? — Hold out the most recent 3 months. Predict 12-month LTV on customers who have since completed 12 months. Compare predicted vs actual. Use rank correlation (Spearman) not just RMSE since relative ordering matters for targeting.",
+      "What's the business tradeoff in setting the intervention threshold? — Lower threshold = more customers contacted = higher cost but higher coverage. Higher threshold = targeted spend but misses borderline cases. Optimize on expected ROI across the threshold sweep."
+    ]
+  },
+  {
+    title: "Hospital Readmission Risk Stratifier",
+    rank: "5th place",
+    rankClass: "r5",
+    resume: "Built a 30-day readmission risk classifier on 100K+ patient records using XGBoost with fairness auditing across demographic groups, cost-sensitive triage, and a clinical risk tier dashboard.",
+    why: "Healthcare ML is increasingly in demand at companies like Practo, PharmEasy, and Apollo. The fairness audit (ML bias across age/gender/race) is a differentiator that almost no student project includes.",
+    business: "Hospitals are penalized by CMS for excessive 30-day readmissions. Identifying high-risk patients at discharge for care coordination programs reduces readmissions and hospital penalties.",
+    datasets: ["Diabetes 130-US hospitals (UCI — 100K+ records, excellent for this)", "MIMIC-III (requires credentialing but very prestigious)", "Hospital Readmissions Reduction Program public data"],
+    algorithms: ["Logistic Regression as clinical baseline (used in actual hospitals)", "Random Forest (handles mixed types well)", "XGBoost (primary model)", "LightGBM comparison"],
+    featureEng: ["Comorbidity count and Charlson Comorbidity Index", "Prior admission count in 6/12 months", "Length of stay, discharge disposition", "Number of procedures/medications at discharge", "Lab value derangements (flag abnormal values)"],
+    imbalance: ["Readmission rate ~11% in 30 days", "class_weight='balanced', scale_pos_weight", "Stratified K-fold with demographic stratification"],
+    evaluation: ["ROC-AUC, PR-AUC, F1 at clinical threshold", "Net Benefit (Decision Curve Analysis) — clinical standard", "Fairness metrics: Equal Opportunity, Demographic Parity across age groups", "Calibration curve essential: clinicians need to trust the probabilities"],
+    explainability: ["SHAP: 'Prior admissions in 90 days (+0.22)', 'HbA1c >9% (+0.18)'", "Clinical risk factors surfaced per patient", "LIME for patient-level explanation", "Population-level SHAP: what drives readmission across all patients?"],
+    deployment: ["Streamlit: discharge patient profile → risk score + clinical tier (Low/Moderate/High/Very High) + care coordination recommendation", "Risk band descriptions: 'High Risk: Refer to care coordinator, schedule 48h follow-up'", "Fairness dashboard: compare model performance across age buckets and gender"],
+    advanced: ["Decision Curve Analysis (net benefit vs treat-all / treat-none baselines)", "Demographic fairness audit using Fairlearn or AIF360", "Clinical threshold: net benefit maximization at clinically relevant FPR", "Calibration is critical: use isotonic regression or Platt scaling"],
+    architecture: ["EHR data → Clinical feature pipeline", "XGBoost risk model", "Fairness audit module (Fairlearn)", "Risk tier assignment", "Streamlit clinical dashboard"],
+    weeks: ["Week 1: Download UCI Diabetes dataset, EDA, understand clinical features", "Week 2: Comorbidity index computation, medication count features, lab flag features", "Week 3: LR / RF / XGBoost with cross-validation, calibration analysis", "Week 4: Decision curve analysis, fairness audit with Fairlearn/AIF360", "Week 5: Streamlit clinical dashboard with risk tiers + fairness display", "Week 6: README, note MIMIC credentialing path for future work"],
+    bullets: [
+      "Built a 30-day hospital readmission classifier on 100K diabetic patient records using XGBoost; achieved 0.79 ROC-AUC with calibrated probabilities validated by decision curve analysis",
+      "Conducted demographic fairness audit using Fairlearn — identified and mitigated 12% gap in false negative rate between age groups via re-weighting",
+      "Engineered 22 clinical features including Charlson Comorbidity Index, prior admission frequency, and medication burden as primary readmission predictors",
+      "Deployed Streamlit clinical dashboard with 4-tier risk stratification, SHAP-driven patient explanations, and care coordination recommendations"
+    ],
+    interview: [
+      "What is Decision Curve Analysis and why is it better than ROC-AUC for clinical models? — DCA plots net benefit across decision thresholds, accounting for the relative harm of FP vs FN at each threshold. It answers 'At what threshold does your model provide net benefit over treat-all or treat-none?' which is directly clinically actionable.",
+      "What fairness metric did you use and why? — Equal Opportunity Difference: the gap in TPR (catching true readmissions) between demographic groups. Missing a readmission is more harmful than a false alarm, so TPR equity matters more than FPR equity here.",
+      "Why is calibration especially important in clinical models? — A clinician who sees '70% risk' may allocate resources differently than if they see '40% risk'. If the model says 70% but the actual rate is 40%, care coordinators will be overwhelmed with false alarms. Calibration = trustworthiness.",
+      "How would you get this approved for clinical use? — Prospective validation on a held-out hospital cohort. Regulatory: FDA classifies clinical decision support into categories. For risk stratification (not direct diagnosis), it's often non-device CDS. Document model card, training data provenance, fairness audit."
+    ]
+  }
+];
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'overview') {
+    document.getElementById('proj-list').style.display = '';
+    document.getElementById('detail-view').style.display = 'none';
+  }
+}
+
+function showDetail(i) {
+  const p = projects[i];
+  document.getElementById('proj-list').style.display = 'none';
+  const dv = document.getElementById('detail-view');
+  dv.style.display = '';
+
+  const datasetsHtml = p.datasets.map(d => `<div class="pill">${d}</div>`).join('');
+  const algoHtml = p.algorithms.map(a => `<div class="pill purple">${a}</div>`).join('');
+  const featHtml = p.featureEng.map(f => `<div class="pill teal">${f}</div>`).join('');
+  const imbHtml = p.imbalance.map(x => `<div class="pill coral">${x}</div>`).join('');
+  const evalHtml = p.evaluation.map(x => `<div class="pill amber">${x}</div>`).join('');
+  const explHtml = p.explainability.map(x => `<div class="pill blue">${x}</div>`).join('');
+  const deployHtml = p.deployment.map(x => `<li>${x}</li>`).join('');
+  const advHtml = p.advanced.map(x => `<div class="pill">${x}</div>`).join('');
+  const archHtml = p.architecture.map(a => `<div class="arch-box">${a}</div>`).join('');
+  const weeksHtml = p.weeks.map(w => `<li>${w}</li>`).join('');
+  const bulletsHtml = p.bullets.map(b => `<div class="bullet-box">• ${b}</div>`).join('');
+  const interviewHtml = p.interview.map(q => `<div class="interview-q">${q}</div>`).join('');
+
+  const promptTitle = p.title;
+
+  dv.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="rank-badge ${p.rankClass}" style="margin-bottom:6px;">${p.rank}</div>
+        <div class="detail-title">${p.title}</div>
+        <div class="detail-resume">"${p.resume}"</div>
+      </div>
+      <button class="back-btn" onclick="goBack()">← All projects</button>
+    </div>
+    <div class="section-label">Why this is better than a typical ML project</div>
+    <p class="prose">${p.why}</p>
+    <div class="section-label">Real-world business use case</div>
+    <p class="prose">${p.business}</p>
+    <div class="section-label">Dataset options</div>
+    <div class="pill-row">${datasetsHtml}</div>
+    <div class="section-label">ML algorithms</div>
+    <div class="pill-row">${algoHtml}</div>
+    <div class="section-label">Feature engineering</div>
+    <div class="pill-row">${featHtml}</div>
+    <div class="section-label">Handling class imbalance</div>
+    <div class="pill-row">${imbHtml}</div>
+    <div class="section-label">Evaluation metrics</div>
+    <div class="pill-row">${evalHtml}</div>
+    <div class="section-label">Explainability</div>
+    <div class="pill-row">${explHtml}</div>
+    <div class="section-label">Deployment / demo</div>
+    <ul class="step-list">${deployHtml}</ul>
+    <div class="section-label">Advanced features (resume differentiators)</div>
+    <div class="pill-row">${advHtml}</div>
+    <div class="section-label">System architecture</div>
+    <div class="arch-row">${archHtml}</div>
+    <div class="section-label">6-week implementation plan</div>
+    <ul class="step-list">${weeksHtml}</ul>
+    <div class="section-label">Resume bullet points</div>
+    ${bulletsHtml}
+    <div class="section-label">Interview talking points</div>
+    ${interviewHtml}
+    <div style="margin-top:1.5rem; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="ask-btn" onclick="sendPrompt('Give me the complete Python implementation plan for the ${promptTitle} project, with file structure and code snippets for each module')">Get full code plan ↗</button>
+      <button class="ask-btn" onclick="sendPrompt('Write a GitHub README for the ${promptTitle} project')">Generate README ↗</button>
+      <button class="ask-btn" onclick="sendPrompt('Give me mock interview Q&A for the ${promptTitle} ML project, 10 deep technical questions')">Mock interview prep ↗</button>
+    </div>
+  `;
+}
+
+function goBack() {
+  document.getElementById('proj-list').style.display = '';
+  document.getElementById('detail-view').style.display = 'none';
+}
+</script>
