@@ -1,0 +1,81 @@
+{
+  "protocol": "customer-heldout-v1",
+  "seed": 42,
+  "target": "positive non-cancelled purchase revenue in INR; not discounted profit",
+  "observation_end_exclusive": "2010-12-01T00:00:00",
+  "target_start": "2010-12-01T00:00:00",
+  "target_end_exclusive": "2011-12-01T00:00:00",
+  "split_counts": {
+    "train": 2974,
+    "calibration": 637,
+    "test": 638
+  },
+  "code_revision": "400d6765a4da0a161eed2bc9ca3e8ba9e8a4f316",
+  "packages": {
+    "numpy": "1.26.4",
+    "pandas": "3.0.5",
+    "scikit-learn": "1.9.1",
+    "lightgbm": "4.7.0",
+    "lifetimes": "0.11.3",
+    "optuna": "5.0.0"
+  },
+  "optuna_trials": 5,
+  "models": {
+    "BG/NBD": {
+      "MAE": 102621.06918781811,
+      "RMSE": 188260.16068866843,
+      "MAPE": 175.82811240070384,
+      "Pearson_r": 0.9533366693098733
+    },
+    "LightGBM": {
+      "MAE": 104081.15441848646,
+      "RMSE": 363000.0841544712,
+      "MAPE": 138.71219581430663,
+      "Pearson_r": 0.7945092611861991
+    },
+    "Stacked": {
+      "MAE": 89887.3633251897,
+      "RMSE": 183877.16235666897,
+      "MAPE": 132.65265463516496,
+      "Pearson_r": 0.9530346390734398
+    }
+  },
+  "data_summary": {
+    "initial_rows": 1067371,
+    "remove_duplicates": {"before": 1067371, "after": 1033036, "removed": 34335},
+    "drop_missing_customer": {"before": 1033036, "after": 797885, "removed": 235151},
+    "remove_cancellations": {"before": 797885, "after": 779495, "removed": 18390},
+    "filter_invalid_qty_price": {"before": 779495, "after": 779425, "removed": 70},
+    "remove_non_products": {"before": 779425, "after": 776624, "removed": 2801},
+    "cap_outliers": {"before": 776624, "after": 776624, "removed": 0},
+    "final_rows": 776624,
+    "unique_customers": 5861,
+    "unique_invoices": 36639,
+    "date_range": ["2009-12-01", "2011-12-09"],
+    "raw_sha256": "bcbe73b35f5b7babf197fb0cb983a11f5d9ff929078d4aa53d171b1f2df2e980"
+  },
+  "best_parameters": {
+    "n_estimators": 526,
+    "learning_rate": 0.007458402142772737,
+    "num_leaves": 92,
+    "max_depth": 7,
+    "min_child_samples": 16,
+    "subsample": 0.7475884550556351,
+    "colsample_bytree": 0.32407196478065287,
+    "reg_alpha": 1.527156759251193,
+    "reg_lambda": 2.133142332373004e-06,
+    "n_jobs": 2
+  },
+  "caveats": [
+    "Customer holdout within one target year, not a rolling future-time backtest",
+    "Uplift outcomes are simulated",
+    "Legacy 43.6% MAE improvement and 0.9902 correlation were in-sample and are superseded"
+  ],
+  "conformal": {
+    "alpha": 0.09999999999999998,
+    "radius_inr": 267912.8647910848,
+    "test_coverage": 0.9153605015673981,
+    "test_mean_width_inr": 358978.8587896736
+  },
+  "pipeline_complete": true
+}
