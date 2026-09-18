@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
+          pip install -r requirements-training.txt -r requirements-dev.txt
 
       - name: Lint
         run: ruff check . --select E9,F63,F7,F82
@@ -41,12 +41,17 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: pip install -r requirements-training.txt -r requirements-dev.txt
       - run: python download_data.py
       - run: python run_pipeline.py --phase all --trials 5
       - run: python -m pytest tests/test_dashboard.py -q
         env:
           CLV_INTEGRATION: "1"
+      - name: Verify real artifacts in the lightweight dashboard runtime
+        run: |
+          python -m venv .demo
+          .demo/bin/pip install -r requirements.txt pytest==9.1.1
+          CLV_INTEGRATION=1 .demo/bin/python -m pytest tests/test_dashboard.py -q
       - name: Publish reproducible validation outputs
         if: always()
         uses: actions/upload-artifact@v4

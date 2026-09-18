@@ -80,7 +80,7 @@ python -m venv .venv
 Activate with `.venv\Scripts\Activate.ps1` in PowerShell, `.venv\Scripts\activate.bat` in Command Prompt, or `source .venv/bin/activate` on Linux/macOS.
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-training.txt
 python download_data.py
 python run_pipeline.py --phase all --trials 5
 streamlit run dashboard/app.py
@@ -91,6 +91,9 @@ The downloader retrieves the [UCI Online Retail II](https://archive.ics.uci.edu/
 The full pipeline writes `pipeline_complete: true` only after all phases finish. The dashboard rejects incompatible manifests and does not silently label old artifacts as current results. Individual `--phase` commands are useful for debugging; use `--phase all` for a complete published artifact set.
 
 ## Dashboard demo
+
+For a dashboard-only installation, `pip install -r requirements.txt` installs six direct runtime dependencies, without the training/SHAP/optimization stack. This is also what Community Cloud installs automatically. Configure the hosted entrypoint as `dashboard/app.py` and Python 3.12. The separate `requirements-training.txt` preserves the exact environment used for the recorded benchmark. CI checks real Parquet outputs in both environments. Live SHAP objects require the training environment; otherwise the dashboard explicitly labels its feature proxy.
+
 
 1. **CLV Explorer:** inspect customer revenue predictions and calibration-derived intervals. Real SHAP values are used when their model artifact is present; otherwise the feature proxy is labelled explicitly.
 2. **Segment Intelligence:** inspect fitted GMM segments and observation-period cohort retention.
