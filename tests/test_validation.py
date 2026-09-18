@@ -54,6 +54,36 @@ def test_monetary_feature_excludes_first_purchase_for_repeat_customers():
     assert FeatureEngineer().build_rfm_summary(df).loc[1, "monetary_value"] == 15
 
 
+def test_test_and_calibration_targets_do_not_influence_fitted_predictions(monkeypatch, tmp_path):
+    import run_pipeline as pipeline
+    from sklearn.dummy import DummyRegressor
+    from src.models.ml_model import CLVBoostingModel
+    from src.models.stacking import StackedCLVModel
+
+    observed = []
+    def tune(self, X, y, n_trials):
+        observed.append(set(X.index))
+        return {}
+    monkeypatch.setattr(CLVBoostingModel, "tune_hyperparameters", tune)
+    monkeypatch.setattr(CLVBoostingModel, "_build_estimator", lambda self, params: DummyRegressor())
+    monkeypatch.setattr(CLVBoostingModel, "compute_shap_values", lambda *args: None)
+    monkeypatch.setattr(CLVBoostingModel, "save", lambda *args: None)
+    monkeypatch.setattr(StackedCLVModel, "save", lambda *args: None)
+    monkeypatch.setattr(pipeline, "OUTPUT_DATA_DIR", tmp_path)
+    monkeypatch.setattr(pipeline, "MODELS_DIR", tmp_path)
+    monkeypatch.setattr(pipeline, "CLV_PREDICTIONS_FILE", tmp_path / "predictions.parquet")
+    X = pd.DataFrame({"feature": np.arange(100, dtype=float)})
+    base = pd.DataFrame({"predicted_clv": np.ones(100), "p_alive": np.full(100, 0.5)})
+    actual = pd.DataFrame({"holdout_revenue": np.arange(100, dtype=float) + 10})
+    split = customer_splits(X.index)
+    first = pipeline.run_ml_models(X, base, actual, n_trials=1)[2]
+    actual.loc[split["test"], "holdout_revenue"] += 1000000
+    actual.loc[split["calibration"], "holdout_revenue"] += 1000000
+    second = pipeline.run_ml_models(X, base, actual, n_trials=1)[2]
+    assert observed == [set(split["train"]), set(split["train"])]
+    np.testing.assert_allclose(first.predicted_clv, second.predicted_clv)
+
+
 def test_temporal_split_has_no_gap_at_boundary():
     df = pd.DataFrame({COL_CUSTOMER: [1, 1, 1], COL_DATE: pd.to_datetime(["2010-11-30 23:59", "2010-12-01 00:00", "2010-12-01 12:00"])})
     obs, target = DataPreprocessor().temporal_split(df)

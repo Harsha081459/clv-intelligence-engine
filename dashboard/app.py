@@ -189,7 +189,7 @@ def load_data(data_root):
     # Try to load real data, fall back to synthetic demo data
     try:
         validation_report = json.loads((Path(base) / "validation_report.json").read_text(encoding="utf-8"))
-        if validation_report.get("protocol") != "customer-heldout-v1":
+        if validation_report.get("protocol") != "customer-heldout-v1" or not validation_report.get("pipeline_complete"):
             raise ValueError("Legacy artifacts must be regenerated with the corrected pipeline")
         customers   = pd.read_parquet(DATA_ROOT / "processed/customer_features.parquet")
         predictions = pd.read_parquet(f"{base}/clv_predictions.parquet")

@@ -12,7 +12,10 @@ Usage:
 
 import argparse
 import json
+import hashlib
 import logging
+import os
+from importlib.metadata import version
 import sys
 import time
 from pathlib import Path
@@ -59,7 +62,10 @@ def run_data_pipeline():
     preprocessor = DataPreprocessor(convert_to_inr=True)
     clean_df = preprocessor.clean(raw_df)
     preprocessor.save_clean_data(clean_df)
-    (OUTPUT_DATA_DIR / "data_summary.json").write_text(json.dumps(preprocessor.get_cleaning_report(), indent=2), encoding="utf-8")
+    data_summary = preprocessor.get_cleaning_report()
+    with RAW_DATA_FILE.open("rb") as source:
+        data_summary["raw_sha256"] = hashlib.file_digest(source, "sha256").hexdigest()
+    (OUTPUT_DATA_DIR / "data_summary.json").write_text(json.dumps(data_summary, indent=2), encoding="utf-8")
     
     # Temporal split
     obs_df, holdout_df = preprocessor.temporal_split(clean_df)
@@ -230,6 +236,9 @@ def run_ml_models(features=None, predictions_prob=None, holdout_actuals=None, n_
         "observation_end_exclusive": OBSERVATION_END.isoformat(),
         "target_start": HOLDOUT_START.isoformat(), "target_end_exclusive": HOLDOUT_END.isoformat(),
         "splits": {name: ids.tolist() for name, ids in split.items()},
+        "split_counts": {name: len(ids) for name, ids in split.items()},
+        "code_revision": os.environ.get("GITHUB_SHA", "local-unrecorded"),
+        "packages": {name: version(name) for name in ["numpy", "pandas", "scikit-learn", "lightgbm", "lifetimes", "optuna"]},
         "optuna_trials": n_trials, "models": results,
         "data_summary": json.loads((OUTPUT_DATA_DIR / 'data_summary.json').read_text(encoding='utf-8')) if (OUTPUT_DATA_DIR / 'data_summary.json').exists() else {},
         "best_parameters": best_params,
@@ -527,6 +536,12 @@ def run_all(n_trials=5):
     
     # Phase 6b: Drift monitoring
     run_drift_monitoring()
+    report_path = OUTPUT_DATA_DIR / "validation_report.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report["pipeline_complete"] = True
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    summary = {key: value for key, value in report.items() if key != "splits"}
+    (OUTPUT_DATA_DIR / "validation_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     
     elapsed = time.time() - start_time
     logger.info(f"\n{'='*60}")

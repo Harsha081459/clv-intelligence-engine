@@ -23,6 +23,7 @@ def test_empty_install_is_explicit_demo_without_fake_benchmarks(monkeypatch, tmp
 def test_real_pipeline_artifacts_and_metrics_match():
     output = ROOT / "data/output"
     report = json.loads((output / "validation_report.json").read_text())
+    assert report["pipeline_complete"] is True
     split = {name: set(ids) for name, ids in report["splits"].items()}
     assert split["train"].isdisjoint(split["calibration"])
     assert split["train"].isdisjoint(split["test"])

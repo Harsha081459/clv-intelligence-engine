@@ -1,297 +1,136 @@
-# 🔮 Customer Lifetime Value Intelligence Engine
+# Customer Lifetime Value Intelligence Engine
 
 ![CI](https://github.com/Harsha081459/clv-intelligence-engine/actions/workflows/ci.yml/badge.svg)
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://clv-intelligence-engine-d7mfl8tlmmw4nfdw52nquk.streamlit.app/)
-![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Machine Learning](https://img.shields.io/badge/Machine%20Learning-LightGBM%20%7C%20BGNBD-0088CC?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-> **Probabilistic CLV Forecasting + Marketing Spend Optimizer + Cohort Risk Dashboard**
+[Streamlit dashboard](https://clv-intelligence-engine-d7mfl8tlmmw4nfdw52nquk.streamlit.app/) · [MIT license](LICENSE)
 
-*Project period: Built Apr–May 2025 (ML course project); published to GitHub Sep 2026.*
+Originally built Apr–May 2025 as an ML course project; validation and demo integration updated September 2026.
 
-A production-grade CLV prediction system that goes far beyond binary churn classification. This engine combines **probabilistic models** (BG/NBD + Gamma-Gamma), **gradient-boosted stacking** (LightGBM), **uplift-based marketing optimization**, **conformal prediction intervals**, and **drift monitoring** — all served through an interactive 4-tab Streamlit dashboard.
+## Problem and scope
 
----
+Given historical customer transactions, estimate purchase revenue over the next year, group customers for analysis, and explore hypothetical marketing allocations. This is a research/portfolio prototype, not a production campaign optimizer.
 
-## 🎯 The Core Insight
+The forecast target is **positive, non-cancelled purchase revenue**, converted from GBP to INR at a fixed factor of 105. It is not net revenue after returns, discounted profit, or an indefinite lifetime value. Existing `predicted_clv` column names are retained as a compatibility alias for this finite-horizon revenue estimate.
 
-Most data science projects predict *"will this customer churn?"* (binary).
+## Architecture
 
-**This project answers a harder, more valuable question:**
-
-> *"How much revenue will each customer generate over the next 12 months, with calibrated uncertainty, and which customers should we target with our ₹50L retention budget to maximize ROI?"*
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    RAW TRANSACTION DATA                             │
-│              UCI Online Retail II (1M+ transactions)                │
-└──────────────────────────┬──────────────────────────────────────────┘
-                           │
-                    ┌──────▼──────┐
-                    │  CLEANING   │  Drop cancellations, missing IDs,
-                    │  & FEATURE  │  non-product codes, outliers
-                    │  ENGINEERING│  Build RFM + 12 behavioral features
-                    └──────┬──────┘
-                           │
-          ┌────────────────┼────────────────┐
-          │                │                │
-   ┌──────▼──────┐  ┌─────▼──────┐  ┌──────▼──────┐
-   │   BG/NBD    │  │  Gamma-    │  │  LightGBM   │
-   │   Model     │  │  Gamma     │  │  + Optuna   │
-   │ (purchases) │  │  (spend)   │  │  (features) │
-   └──────┬──────┘  └─────┬──────┘  └──────┬──────┘
-          │               │                │
-          └───────┬───────┘                │
-                  │                        │
-           ┌──────▼──────┐                 │
-           │ Probabilistic│                │
-           │    CLV       │                │
-           └──────┬───────┘                │
-                  │                        │
-                  └──────────┬─────────────┘
-                             │
-                      ┌──────▼──────┐
-                      │  STACKING   │  Ridge meta-learner
-                      │  ENSEMBLE   │  on OOF predictions
-                      └──────┬──────┘
-                             │
-        ┌────────────────────┼────────────────────┐
-        │                    │                    │
- ┌──────▼──────┐     ┌──────▼──────┐     ┌───────▼───────┐
- │  GMM-based  │     │   Uplift    │     │   Conformal   │
- │ Segmentation│     │  T-Learner  │     │  Prediction   │
- │ (5 cohorts) │     │ (causal)    │     │  Intervals    │
- └──────┬──────┘     └──────┬──────┘     └───────┬───────┘
-        │                   │                    │
-        └────────┬──────────┘                    │
-                 │                               │
-          ┌──────▼──────┐                 ┌──────▼──────┐
-          │   BUDGET    │                 │    DRIFT    │
-          │  OPTIMIZER  │                 │   MONITOR   │
-          │ (greedy ROI)│                 │   (PSI)     │
-          └──────┬──────┘                 └──────┬──────┘
-                 │                               │
-                 └───────────┬───────────────────┘
-                             │
-                    ┌────────▼────────┐
-                    │   STREAMLIT     │
-                    │   DASHBOARD     │
-                    │   (4 tabs)      │
-                    └─────────────────┘
+```text
+UCI Online Retail II workbook
+  -> deterministic cleaning (no outcome-dependent outlier removal by default)
+  -> observation transactions: [2009-12-01, 2010-12-01)
+  -> RFM + behavioural features per customer
+  -> target transactions: [2010-12-01, 2011-12-01)
+  -> stable customer partitions: 70% train / 15% calibration / 15% test
+       train -> BG/NBD + Gamma-Gamma baseline
+             -> Optuna-tuned LightGBM
+             -> out-of-fold base predictions -> Ridge stacker
+       calibration -> finite-sample residual quantile for intervals
+       test -> model comparison and empirical interval coverage
+  -> GMM segmentation / simulated T-Learner uplift / quarterly PSI
+  -> versioned validation manifest + Parquet artifacts
+  -> four-tab Streamlit dashboard
 ```
 
----
+## Validation protocol
 
-## 📊 Model Comparison
+- No calibration/test revenue labels enter base-model training, Optuna tuning or stacker fitting.
+- LightGBM stacking features are genuinely out-of-fold: a fresh estimator is trained without each validation fold.
+- All compared models predict the same undiscounted revenue target. The older pipeline compared margin-adjusted probabilistic CLV with raw revenue.
+- Intervals are centred on the fitted stacker's predictions. Their radius uses only calibration residuals; coverage is measured on separate test customers.
+- This is **customer-held-out validation within one target year**, not a rolling or prospective future-period backtest. Training customers' target-period revenue is available during model fitting.
+- GMM clustering, SHAP attribution and simulated campaign outputs are descriptive analysis, not additional held-out performance benchmarks.
 
-| Model | MAE (₹) | RMSE (₹) | MAPE (%) | Pearson r | Description |
-|-------|---------|----------|----------|-----------|-------------|
-| BG/NBD + Gamma-Gamma | ₹1,04,836 | ₹4,09,761 | 114.9% | 0.8947 | Probabilistic baseline |
-| LightGBM (Optuna-tuned) | ₹60,050 | ₹1,00,496 | 81.7% | 0.9898 | Feature-rich ML model |
-| **Stacked Ensemble** | **₹59,138** | **₹97,160** | **78.9%** | **0.9902** | **Best: Ridge meta-learner** |
+### Results and evidence
 
-> Stacking reduces MAE by **43.6%** over the probabilistic baseline and achieves near-perfect correlation (r=0.99).
-> Conformal prediction intervals achieve **85.6% empirical coverage** (90% target) with avg interval width ₹3,17,215.
+The authoritative outputs are generated by the command below:
 
----
+| Artifact | Contents |
+|---|---|
+| `data/output/validation_report.json` | Protocol version, customer partitions, seed, Optuna parameters, dataset fingerprint, test metrics and interval coverage |
+| `data/output/evaluation_predictions.parquet` | Test-customer predictions and actual outcomes, allowing independent metric recomputation |
+| `data/output/model_comparison.parquet` | BG/NBD, LightGBM and stacker errors on exactly the same test customers |
+| `data/output/data_summary.json` | Raw/cleaned row counts, cleaning decisions and raw-workbook SHA-256 |
 
-## 🧠 ML Techniques
+GitHub Actions runs the real workbook pipeline and uploads these artifacts as `clv-validation`. A smoke test recomputes stacker MAE directly from the saved test predictions and opens the dashboard using actual pipeline artifacts.
 
-### Layer 1: Probabilistic Core
-- **BG/NBD** (Beta-Geometric / Negative Binomial Distribution) — models purchase frequency and dropout probability simultaneously
-- **Gamma-Gamma** — predicts expected average transaction value for alive customers
-- **Combined CLV** = E[transactions] × E[avg order value] × gross margin
+**Superseded claims:** the older **43.6% MAE reduction** and **0.9902 Pearson correlation** were calculated using predictions on the LightGBM/stacker fitting rows. They are not valid held-out results. The old **85.6% coverage** must also not be quoted as an independently validated current result. Historical notebooks, plots and `report.tex` predate this correction; regenerate results instead of quoting their old tables.
 
-### Layer 2: ML Augmentation
-- **LightGBM** with Bayesian hyperparameter tuning via **Optuna** (30 trials, 5-fold CV)
-- **16 engineered features**: RFM core (4) + behavioral (9) + cohort (2) + total revenue
-- **SHAP** explainability for feature importance
+## Clean-clone setup
 
-### Layer 3: Stacking Ensemble
-- **Ridge meta-learner** trained on out-of-fold predictions from BG/NBD and LightGBM
-- Prevents data leakage via proper OOF prediction collection
+Use Python 3.12. Dataset download requires internet access; the pipeline runs locally after download.
 
-### Layer 4: Actionable Intelligence
-- **GMM Segmentation** — BIC-optimal Gaussian Mixture Model clusters customers into: Champions, At-Risk High-Value, Promising, Hibernating, Lost
-- **T-Learner Uplift Modeling** — causal inference to identify *persuadable* customers (not just likely buyers)
-- **Budget Optimizer** — greedy ROI-maximizing allocation of ₹50L quarterly retention budget
-- **Conformal Prediction** — distribution-free 90% coverage intervals (e.g., "CLV ₹4,200 (₹2,800–₹5,900)")
-- **PSI Drift Monitoring** — quarterly Population Stability Index tracking with automated alerts
-
----
-
-## 📁 Project Structure
-
-```
-clv-intelligence-engine/
-├── README.md
-├── requirements.txt
-├── run_pipeline.py                    # Main pipeline orchestrator (CLI)
-├── download_data.py                   # Dataset download helper
-├── generate_demo_transactions.py      # Generates synthetic transaction data for dashboard demos
-│
-├── src/
-│   ├── config.py                # Central configuration (paths, params, constants)
-│   ├── data/
-│   │   ├── loader.py            # Excel/CSV data loading
-│   │   ├── preprocessor.py      # Cleaning pipeline (7 steps)
-│   │   └── feature_engineering.py  # RFM + behavioral + cohort features
-│   ├── models/
-│   │   ├── probabilistic.py     # BG/NBD + Gamma-Gamma (lifetimes)
-│   │   ├── ml_model.py          # LightGBM/XGBoost + Optuna + SHAP
-│   │   ├── stacking.py          # Ridge meta-learner ensemble
-│   │   ├── segmentation.py      # GMM segmentation (BIC-optimal k)
-│   │   └── uplift.py            # T-Learner uplift model
-│   ├── optimization/
-│   │   └── budget_allocator.py  # Greedy ROI budget optimizer
-│   ├── monitoring/
-│   │   ├── conformal.py         # MAPIE conformal prediction intervals
-│   │   └── drift.py             # PSI drift monitoring + alerting
-│   └── evaluation/
-│       └── metrics.py           # MAE, RMSE, MAPE, Pearson r, decile lift, Qini
-│
-├── dashboard/
-│   └── app.py                   # 4-tab Streamlit dashboard
-│
-├── notebooks/
-│   ├── 01_eda_and_data_cleaning.ipynb
-│   ├── 02_bgnbd_gamma_gamma.ipynb
-│   ├── 03_ml_augmentation.ipynb
-│   ├── 04_segmentation_uplift.ipynb
-│   └── 05_uncertainty_monitoring.ipynb
-│
-├── data/
-│   ├── raw/                     # Original Excel dataset
-│   ├── processed/               # Clean parquet files
-│   └── output/                  # Model predictions, segments, PSI
-│
-└── models/                      # Saved model artifacts (.pkl)
-```
-
----
-
-## 🚀 Quick Start
-
-### 1. Clone & Setup
 ```bash
 git clone https://github.com/Harsha081459/clv-intelligence-engine.git
 cd clv-intelligence-engine
+python -m venv .venv
+```
 
-# Create virtual environment
-python -m venv venv
-venv\Scripts\activate    # Windows
-# source venv/bin/activate  # Linux/Mac
+Activate with `.venv\Scripts\Activate.ps1` in PowerShell, `.venv\Scripts\activate.bat` in Command Prompt, or `source .venv/bin/activate` on Linux/macOS.
 
+```bash
 pip install -r requirements.txt
-```
-
-### 2. Download Dataset
-```bash
 python download_data.py
-```
-Downloads the [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii) dataset (~43 MB).
-
-### 3. Run the Full Pipeline
-```bash
-python run_pipeline.py --phase all
-```
-
-Available phases: `data`, `probabilistic`, `ml`, `segmentation`, `uplift`, `conformal`, `drift`, `dashboard`
-
-### 4. Launch Dashboard
-```bash
+python run_pipeline.py --phase all --trials 5
 streamlit run dashboard/app.py
 ```
 
----
+The downloader retrieves the [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii) workbook. Both sheets are loaded. Raw data, model files and generated output Parquets are ignored by Git.
 
-## 📈 Dashboard Preview
+The full pipeline writes `pipeline_complete: true` only after all phases finish. The dashboard rejects incompatible manifests and does not silently label old artifacts as current results. Individual `--phase` commands are useful for debugging; use `--phase all` for a complete published artifact set.
 
-The Streamlit dashboard provides 4 interactive tabs:
+## Dashboard demo
 
-| Tab | What It Shows |
-|-----|---------------|
-| **CLV Explorer** | Individual customer CLV lookup, distribution histograms, top customers table |
-| **Segment Intelligence** | GMM cluster visualization, segment profiles, recommended actions per cohort |
-| **Budget Optimizer** | ROI curves, scenario analysis (conservative/base/optimistic), optimal allocation breakdown |
-| **Model Health** | PSI drift heatmap, conformal coverage validation, model comparison metrics |
+1. **CLV Explorer:** inspect customer revenue predictions and calibration-derived intervals. Real SHAP values are used when their model artifact is present; otherwise the feature proxy is labelled explicitly.
+2. **Segment Intelligence:** inspect fitted GMM segments and observation-period cohort retention.
+3. **Budget Optimizer:** explore a hypothetical contact budget and scenario multipliers. Uplift scores from the T-Learner are currency-valued gains, not percentages. Customers with predicted gain below contact cost are not selected.
+4. **Model Health:** inspect measured test-set coverage, quarterly PSI and test-set model comparisons.
 
----
+Without completed artifacts, the dashboard has a clearly marked **illustrative demo mode** with synthetic customer data. It does not display fabricated accuracy or coverage as measured results. The hosted Streamlit instance may use this mode if artifacts have not been deployed; local/CI verification does not certify the hosted instance's data source.
 
-## 📊 Dataset
+## Campaign simulation caveat
 
-**UCI Online Retail II** — Real transactional data from a UK-based online retailer (Dec 2009 – Dec 2011).
+There is no real marketing intervention dataset here. `src/models/uplift.py` randomly assigns treatment and constructs synthetic treatment outcomes. Counts such as "424 persuadable customers" from older runs are simulation-derived labels, not discovered causal effects. The dashboard's gain-ranking chart is not an empirical Qini evaluation. Budget settings (including an INR 50 lakh ceiling) are scenario inputs, not demonstrated savings or revenue.
 
-| Metric | Value |
-|--------|-------|
-| Raw transactions | 1,067,371 |
-| After cleaning | ~775,847 (72.7% retained) |
-| Unique customers | ~5,853 |
-| Observation window | Dec 2009 – Dec 2010 (model training) |
-| Holdout window | Dec 2010 – Dec 2011 (validation) |
-| Currency | GBP → INR (×105) |
-
----
-
-## 🔑 Key Findings
-
-1. **BG/NBD achieves Pearson r = 0.8947** on holdout CLV prediction, validating the probabilistic framework for this dataset
-2. **Stacked ensemble (r=0.9902) cuts MAE by 43.6%** — Ridge meta-learner with coefficients bgf=-0.13, lgbm=1.09 learns to weight LightGBM heavily while using BG/NBD as a corrective signal
-3. **GMM identifies 5 optimal segments** (BIC-selected): Champions (e.g., avg CLV ₹3.6L), At-Risk High-Value, Promising, Hibernating, and Lost customers needing tailored re-engagement.
-4. **Uplift modeling identifies 424 persuadable + 849 favourable customers** — these are the ones whose behavior changes due to marketing intervention, not just those who would buy anyway
-5. **Conformal intervals achieve 85.6% empirical coverage** with avg width ₹3.17L — giving finance teams worst/best case revenue scenarios with mathematical guarantees
-
----
-
-## 🛠️ Tech Stack
-
-| Component | Library | Version |
-|-----------|---------|---------|
-| Probabilistic CLV | lifetimes | 0.11.3 |
-| Gradient Boosting | LightGBM | 4.6+ |
-| Hyperparameter Tuning | Optuna | 4.8+ |
-| Explainability | SHAP | 0.49+ |
-| Conformal Prediction | MAPIE | 1.4+ |
-| Dashboard | Streamlit | 1.57+ |
-| Visualization | Plotly | 6.7+ |
-| Data Processing | pandas, numpy, pyarrow | Latest |
-| Clustering | scikit-learn (GMM) | 1.8+ |
-
----
-
-## ⚠️ Limitations
-
-- **MAPE is 78.9% even for the best model** (Model Comparison table) — CLV is
-  heavy-tailed, so percentage errors on low-value customers dominate; MAE and
-  Pearson r are the meaningful accuracy metrics here.
-- **Conformal intervals under-cover**: 85.6% empirical coverage vs the 90%
-  target (`src/config.py`: `CONFORMAL_COVERAGE = 0.90`; Key Findings #5).
-- **Single holdout year** (Dec 2010–Dec 2011, `src/config.py`:
-  `HOLDOUT_START`/`HOLDOUT_END`) — no rolling or multi-window backtest.
-- **Currency conversion is a fixed constant**: `GBP_TO_INR = 105.0`
-  (`src/config.py`) — not a live or historical FX series.
-- **Uplift "treatment" is simulated, not experimental**: `src/models/uplift.py`
-  randomly assigns `treatment_fraction` of customers and applies an artificial
-  revenue boost to the treated group — the T-Learner demonstrates the method,
-  not a real campaign effect.
-
-## ✅ Tests
+## Tests
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -q
+python -m pytest -q
 ```
 
-The suite covers `src/evaluation/metrics.py`, `src/monitoring/drift.py` (PSI),
-and `src/optimization/budget_allocator.py` on toy inputs — no dataset, model
-files, or network required.
+Tests cover metrics, PSI, budget limits, partition disjointness, true out-of-fold predictions, target-leakage regressions, boundary dates, RFM monetary values and the illustrative dashboard.
 
-## 📝 License
+After the full pipeline, also run:
 
-MIT — see [LICENSE](LICENSE). Dataset sourced from the
-[UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/502/online+retail+ii).
+```bash
+CLV_INTEGRATION=1 python -m pytest tests/test_dashboard.py -q
+```
+
+In PowerShell set `$env:CLV_INTEGRATION='1'` before running pytest. This checks test-prediction metrics and the real-artifact dashboard. GitHub CI runs both test modes on Linux.
+
+## Tech stack
+
+| Component | Technology |
+|---|---|
+| Data ingestion / artifacts | pandas, NumPy, openpyxl, Parquet / PyArrow |
+| Probabilistic baseline | lifetimes BG/NBD + Gamma-Gamma |
+| Regression / stacking | LightGBM, Optuna, scikit-learn Ridge |
+| Segmentation | scikit-learn GaussianMixture |
+| Explanations | SHAP |
+| Uncertainty | Split-conformal residual quantiles |
+| Simulated uplift | XGBoost T-Learner |
+| Dashboard | Streamlit, Plotly |
+| Verification | pytest, Ruff, GitHub Actions |
+
+## Limitations
+
+- One dataset, one observation/target period and a fixed seed; no external validation, repeated-seed confidence intervals or rolling backtest.
+- Positive-purchase revenue excludes cancellations/returns and uses a fixed FX conversion. Revenue is not profit.
+- BG/NBD and Gamma-Gamma assumptions are not guaranteed to hold for this retailer; a more complex model need not outperform the baseline.
+- Conformal intervals rely on exchangeability and provide marginal, not customer-specific, coverage guarantees under their assumptions.
+- Simulated uplift cannot establish causal marketing impact or production ROI.
+- Forecasting, segmentation and campaign scenarios are separate outputs; do not interpret an attractive dashboard as evidence of model accuracy.
+
+## License
+
+MIT — see [LICENSE](LICENSE). The dataset has its own UCI source terms.

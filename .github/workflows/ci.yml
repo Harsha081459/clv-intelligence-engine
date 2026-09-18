@@ -54,6 +54,7 @@ jobs:
           name: clv-validation
           path: |
             data/output/validation_report.json
+            data/output/validation_summary.json
             data/output/data_summary.json
             data/output/model_comparison.parquet
             data/output/evaluation_predictions.parquet
