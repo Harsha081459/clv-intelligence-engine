@@ -257,6 +257,14 @@ class ProbabilisticCLV:
         )
         return clv_full
 
+    def predict_revenue(self, rfm_data: pd.DataFrame, days: int = 365) -> pd.Series:
+        self._check_ggf()
+        expected_spend = self.ggf.conditional_expected_average_profit(
+            rfm_data["frequency"], rfm_data["monetary_value"]
+        )
+        revenue = self.predict_purchases(rfm_data, t=days) * expected_spend
+        return pd.Series(np.maximum(revenue, 0), index=rfm_data.index)
+
     def predict_all(
         self,
         rfm_data: pd.DataFrame,

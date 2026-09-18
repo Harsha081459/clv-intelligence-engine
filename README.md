@@ -1,11 +1,14 @@
 # 🔮 Customer Lifetime Value Intelligence Engine
 
+![CI](https://github.com/Harsha081459/clv-intelligence-engine/actions/workflows/ci.yml/badge.svg)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://clv-intelligence-engine-d7mfl8tlmmw4nfdw52nquk.streamlit.app/)
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Machine Learning](https://img.shields.io/badge/Machine%20Learning-LightGBM%20%7C%20BGNBD-0088CC?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 > **Probabilistic CLV Forecasting + Marketing Spend Optimizer + Cohort Risk Dashboard**
+
+*Project period: Built Apr–May 2025 (ML course project); published to GitHub Sep 2026.*
 
 A production-grade CLV prediction system that goes far beyond binary churn classification. This engine combines **probabilistic models** (BG/NBD + Gamma-Gamma), **gradient-boosted stacking** (LightGBM), **uplift-based marketing optimization**, **conformal prediction intervals**, and **drift monitoring** — all served through an interactive 4-tab Streamlit dashboard.
 
@@ -125,7 +128,7 @@ Most data science projects predict *"will this customer churn?"* (binary).
 ## 📁 Project Structure
 
 ```
-ML_Project/
+clv-intelligence-engine/
 ├── README.md
 ├── requirements.txt
 ├── run_pipeline.py                    # Main pipeline orchestrator (CLI)
@@ -261,25 +264,34 @@ The Streamlit dashboard provides 4 interactive tabs:
 
 ---
 
-## 💡 Why This Impresses Recruiters
+## ⚠️ Limitations
 
-**To a product ML team:**
-> "This person understands that the business question is not 'will they churn' but 'how much revenue are they worth, and what should I do about it.' They built an optimizer, not just a classifier."
+- **MAPE is 78.9% even for the best model** (Model Comparison table) — CLV is
+  heavy-tailed, so percentage errors on low-value customers dominate; MAE and
+  Pearson r are the meaningful accuracy metrics here.
+- **Conformal intervals under-cover**: 85.6% empirical coverage vs the 90%
+  target (`src/config.py`: `CONFORMAL_COVERAGE = 0.90`; Key Findings #5).
+- **Single holdout year** (Dec 2010–Dec 2011, `src/config.py`:
+  `HOLDOUT_START`/`HOLDOUT_END`) — no rolling or multi-window backtest.
+- **Currency conversion is a fixed constant**: `GBP_TO_INR = 105.0`
+  (`src/config.py`) — not a live or historical FX series.
+- **Uplift "treatment" is simulated, not experimental**: `src/models/uplift.py`
+  randomly assigns `treatment_fraction` of customers and applies an artificial
+  revenue boost to the treated group — the T-Learner demonstrates the method,
+  not a real campaign effect.
 
-**To a data science interviewer:**
-> BG/NBD is a proper probabilistic model with real math — Beta distributions and purchase process modeling — not just "I tuned XGBoost."
+## ✅ Tests
 
-**To a fintech recruiter:**
-> CLV connects directly to credit limit assignment, product upsell targeting, and customer acquisition cost justification.
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
 
-**The uplift modeling angle is particularly rare.** Explaining the difference between "who will buy" and "who will buy *because of us*" signals business maturity.
-
----
+The suite covers `src/evaluation/metrics.py`, `src/monitoring/drift.py` (PSI),
+and `src/optimization/budget_allocator.py` on toy inputs — no dataset, model
+files, or network required.
 
 ## 📝 License
 
-This project is for educational and portfolio purposes. Dataset sourced from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/502/online+retail+ii).
-
----
-
-*Built with ❤️ as a portfolio project demonstrating production-grade ML engineering.*
+MIT — see [LICENSE](LICENSE). Dataset sourced from the
+[UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/502/online+retail+ii).

@@ -76,8 +76,8 @@ OBSERVATION_START = datetime(2009, 12, 1)
 OBSERVATION_END = datetime(2010, 12, 1)
 
 # Holdout window: next ~12 months (for validation)
-HOLDOUT_START = datetime(2010, 12, 2)
-HOLDOUT_END = datetime(2011, 12, 9)
+HOLDOUT_START = OBSERVATION_END
+HOLDOUT_END = datetime(2011, 12, 1)
 
 # ============================================================
 # Currency Configuration

@@ -40,3 +40,15 @@ Thumbs.db
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Tool caches & env
+.pytest_cache/
+.ruff_cache/
+.env
+
+# Checkpoints / weights
+checkpoints/
+*.pt
+*.pth
+*.onnx
+*.safetensors

@@ -401,6 +401,7 @@ class CLVBoostingModel:
         """Instantiate a scikit-learn-compatible estimator."""
         merged = dict(LGBM_DEFAULT_PARAMS)  # start from defaults
         merged.update(params)
+        merged["n_jobs"] = 2
 
         if self.model_type == "lightgbm":
             import lightgbm as lgb

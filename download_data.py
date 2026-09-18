@@ -38,8 +38,6 @@ def download_dataset():
     
     # Create SSL context that doesn't verify (some corporate networks block UCI)
     ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
     
     try:
         # Download with progress

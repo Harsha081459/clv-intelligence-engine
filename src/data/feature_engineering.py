@@ -103,9 +103,9 @@ class FeatureEngineer:
         # Monetary value = average order value (for repeat customers only)
         # For customers with frequency=0 (single purchase), set monetary_value 
         # to their single order value for feature purposes
-        repeat_customers = orders.groupby(COL_CUSTOMER).filter(
-            lambda x: x[COL_INVOICE].nunique() > 1
-        )
+        ordered = orders.sort_values([COL_CUSTOMER, COL_DATE, COL_INVOICE])
+        repeat_customers = ordered[ordered.groupby(COL_CUSTOMER).cumcount() > 0]
+        rfm['monetary_value'] = np.nan
         
         if len(repeat_customers) > 0:
             avg_order_value = (

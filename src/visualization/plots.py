@@ -17,7 +17,7 @@ from plotly.subplots import make_subplots
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from src.config import CURRENCY_SYMBOL
+from src.config import CURRENCY_SYMBOL, CONFORMAL_ALPHA
 
 logger = logging.getLogger(__name__)
 

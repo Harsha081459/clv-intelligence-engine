@@ -20,7 +20,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import os, warnings
+import json
+import sys
+from pathlib import Path
 import joblib
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+DATA_ROOT = Path(os.environ.get("CLV_DATA_DIR", ROOT / "data"))
 
 warnings.filterwarnings("ignore")
 
@@ -173,23 +180,35 @@ section[data-testid="stSidebar"] .stMarkdown h2 {
 
 
 # ── DATA LOADING ──
-@st.cache_data
-def load_data():
+@st.cache_data(ttl=30)
+def load_data(data_root):
     """Load all pre-computed outputs from the ML pipeline."""
-    base = "data/output"
+    base = str(Path(data_root) / "output")
+    validation_report = {}
     
     # Try to load real data, fall back to synthetic demo data
     try:
-        customers   = pd.read_parquet(f"data/processed/customer_features.parquet")
-        predictions = pd.read_parquet(f"{base}/predictions.parquet")
-        segments    = pd.read_parquet(f"{base}/segments.parquet")
+        validation_report = json.loads((Path(base) / "validation_report.json").read_text(encoding="utf-8"))
+        if validation_report.get("protocol") != "customer-heldout-v1":
+            raise ValueError("Legacy artifacts must be regenerated with the corrected pipeline")
+        customers   = pd.read_parquet(DATA_ROOT / "processed/customer_features.parquet")
+        predictions = pd.read_parquet(f"{base}/clv_predictions.parquet")
+        segments    = pd.read_parquet(f"{base}/customer_segments.parquet")
         uplift      = pd.read_parquet(f"{base}/uplift_scores.parquet")
         psi_data    = pd.read_parquet(f"{base}/quarterly_psi.parquet")
         cohort      = pd.read_parquet(f"{base}/cohort_retention.parquet")
         metrics_df  = pd.read_parquet(f"{base}/model_comparison.parquet")
+        predictions = predictions.reset_index().rename(columns={"index": "CustomerID", "clv_lower": "ci_lower", "clv_upper": "ci_upper"})
+        segments = segments.reset_index().rename(columns={"index": "CustomerID"})
+        customers = customers.rename(columns={"monetary_value": "monetary", "T": "tenure_days"})
+        uplift["incremental_rev"] = uplift["uplift_score"]
         has_real    = True
-    except Exception:
+    except FileNotFoundError:
         has_real = False
+        validation_report = {}
+    except (ValueError, KeyError) as exc:
+        st.error(f"Invalid pipeline artifacts: {exc}")
+        st.stop()
 
     if not has_real:
         # ── Synthetic demo data (runs when no parquet files exist) ──
@@ -264,15 +283,7 @@ def load_data():
                 cohort_rows.append({"cohort": c, "month_num": m, "retention": round(min(1, base_ret), 3)})
         cohort = pd.DataFrame(cohort_rows)
 
-        metrics_df = pd.DataFrame({
-            "model":       ["BG/NBD Baseline","LightGBM (standalone)","Stacked Ensemble"],
-            "MAE":         [4821.3, 3124.7, 2720.5],
-            "RMSE":        [8934.1, 6211.3, 5432.8],
-            "MAPE_pct":    [68.4,   42.1,   37.6],
-            "spearman_rho":[0.61,   0.78,   0.83],
-            "coverage_pct":[None,   None,   85.6],
-            "interval_width":[None, None,  3241.5],
-        })
+        metrics_df = pd.DataFrame()
 
     # Convert ID to match across sets
     if 'CustomerID' not in customers.columns and customers.index.name == 'CustomerID':
@@ -285,7 +296,8 @@ def load_data():
         uplift = uplift.rename(columns={'customer_id': 'CustomerID'})
 
     # Merge all into master
-    master = customers.merge(predictions, on="CustomerID", how="left")
+    customers = customers.drop(columns=[c for c in predictions.columns if c != "CustomerID" and c in customers.columns])
+    master = customers.merge(predictions, on="CustomerID", how="left", validate="one_to_one")
     
     # Safely merge segments
     seg_cols = ["CustomerID", "segment_name"]
@@ -302,7 +314,7 @@ def load_data():
 
     # Calculate fixed base CLV
     rng = np.random.default_rng(seed=42)
-    master["base_clv"] = master["predicted_clv"] * rng.uniform(0.7, 0.9, len(master))
+    master["base_clv"] = master["predicted_clv_bgnbd"] if has_real else master["predicted_clv"] * rng.uniform(0.7, 0.9, len(master))
 
     seg_meta = []
     if "segment_name" in master.columns:
@@ -318,16 +330,21 @@ def load_data():
             })
     seg_summary = pd.DataFrame(seg_meta)
 
-    return master, psi_data, cohort, metrics_df, seg_summary
+    return master, psi_data, cohort, metrics_df, seg_summary, has_real, validation_report
 
-master, psi_data, cohort, metrics_df, seg_summary = load_data()
+master, psi_data, cohort, metrics_df, seg_summary, has_real, validation_report = load_data(str(DATA_ROOT))
+if has_real:
+    st.info("Validated pipeline artifacts loaded. Performance metrics use held-out customers; uplift remains a treatment simulation.")
+else:
+    st.warning("Illustrative demo data only. Predictions, segments, intervals and drift values below are synthetic UI examples, not model measurements. Run python run_pipeline.py --phase all to load real artifacts.")
+st.caption("Amounts labelled CLV are a finite-horizon purchase-revenue proxy in INR, not discounted lifetime profit. Budget allocation is a simulation, not an observed campaign ROI.")
 
 
 # ── SIDEBAR ──
 with st.sidebar:
     st.markdown("## 💎")
     st.markdown("## CLV Intelligence Engine")
-    st.markdown("**Production-Grade ML**  \nPredictive & Causal Modeling")
+    st.markdown("**Research Prototype**  \nRevenue Forecasting & Campaign Simulation")
     st.divider()
 
     st.markdown("## 🔍 GLOBAL FILTERS")
@@ -349,10 +366,10 @@ with st.sidebar:
     with st.expander("About this Model"):
         st.markdown(
             "- **Model**: Stacked Ensemble (BG/NBD + LightGBM + Ridge)\n"
-            "- **MAE reduction**: 43.6% over probabilistic baseline\n"
-            "- **Conformal coverage**: 85.6% (target: 90%)\n"
-            "- **Segments**: GMM, BIC-optimal k=7\n"
-            "- **Uplift**: T-Learner meta-learner"
+            "- **Validation**: 70/15/15 train/calibration/test customers\n"
+            "- **Conformal**: calibration-only residual quantile, 90% target\n"
+            "- **Segments**: GMM; selected k depends on the fitted data\n"
+            "- **Uplift**: T-Learner on simulated treatment outcomes"
         )
 
 
@@ -365,6 +382,10 @@ if "predicted_clv" in filtered.columns:
 if "p_alive" in filtered.columns:
     filtered = filtered[(filtered["p_alive"] >= sel_pa[0]) & (filtered["p_alive"] <= sel_pa[1])]
 
+
+if filtered.empty:
+    st.info("No customers match these filters. Widen the ranges or select All Segments.")
+    st.stop()
 
 # ── KPI ROW ──
 st.markdown('<div class="app-header"><div class="app-title">CLV Intelligence Engine</div><div class="app-subtitle">Marketing Spend Optimizer • Cohort Risk Dashboard</div></div>', unsafe_allow_html=True)
@@ -446,11 +467,11 @@ with tab1:
         
         use_real_shap = False
         try:
-            shap_data = joblib.load("models/shap_values.pkl")
+            shap_data = joblib.load(ROOT / "models/shap_values.pkl")
             shap_vals = shap_data["shap_values"]
             feature_names = shap_data["feature_names"]
             
-            features_df = pd.read_parquet("data/processed/customer_features.parquet")
+            features_df = pd.read_parquet(DATA_ROOT / "processed/customer_features.parquet")
             cid_to_idx = {cid: idx for idx, cid in enumerate(features_df.index)}
             use_real_shap = True
         except Exception:
@@ -605,12 +626,12 @@ with tab3:
         opt_df = filtered.copy()
         opt_df['adjusted_uplift'] = opt_df['uplift_score'] * scenario_multiplier
         # Calculate revenue impact based on uplift * predicted_clv
-        opt_df['incremental_rev'] = opt_df['adjusted_uplift'] * opt_df['predicted_clv']
+        opt_df['incremental_rev'] = opt_df['incremental_rev'] * scenario_multiplier
         opt_df['roi_ratio'] = opt_df['incremental_rev'] / cost_per_contact
         opt_df = opt_df.sort_values('roi_ratio', ascending=False)
         
         max_customers = int(total_budget / cost_per_contact)
-        selected = opt_df.head(max_customers)
+        selected = opt_df.loc[opt_df['incremental_rev'] > cost_per_contact].head(max_customers)
         
         total_cost = len(selected) * cost_per_contact
         expected_revenue = selected['incremental_rev'].sum()
@@ -643,7 +664,7 @@ with tab3:
             for mult_name, mult in [('Conservative', 0.7), ('Base', 1.0), ('Optimistic', 1.3)]:
                 temp_df = opt_df.copy()
                 # Fix: cumsum scaling correctly
-                temp_df["cum_rev"] = (temp_df["incremental_rev"] * mult).cumsum()
+                temp_df["cum_rev"] = (temp_df["incremental_rev"] / scenario_multiplier * mult).cumsum()
                 
                 for budget in budget_levels:
                     n = min(len(temp_df), int(budget / cost_per_contact))
@@ -660,8 +681,8 @@ with tab3:
             fig.update_layout(plot_bgcolor="#0d0f18", paper_bgcolor="#0d0f18", margin=dict(l=0, r=0, t=30, b=0), height=350)
             st.plotly_chart(fig, use_container_width=True)
             
-        st.markdown("#### Qini Curve — Uplift Model vs Random Targeting")
-        st.markdown("A positive Qini coefficient means the uplift model captures more incremental revenue than random budget allocation. It proves we are effectively targeting persuadable customers instead of wasting budget on sure-things or lost-causes.")
+        st.markdown("#### Simulated Gain Ranking")
+        st.markdown("This plots predicted gains from simulated treatment outcomes. It is not an empirical Qini evaluation or proof of campaign effectiveness.")
         
         order = np.argsort(-opt_df["uplift_score"].values)
         y_sorted = opt_df["incremental_rev"].values[order]
@@ -683,15 +704,10 @@ with tab4:
     
     with col_left:
         st.markdown("#### Conformal Coverage")
-        st.metric(label="Empirical Coverage", value="85.6%", delta="-4.4% vs Target (90%)", delta_color="inverse")
-        
-        with st.expander("Why is empirical coverage 85.6%?"):
-            st.write(
-                "The CLV distribution is extremely heavy-tailed, which frequently breaks exchangeability assumptions required by standard conformal prediction. "
-                "Additionally, the calibration set size might be too small to reliably cover the extreme upper bounds. "
-                "In business terms, this means our confidence intervals are slightly too narrow and miss some extreme purchases. "
-                "To fix this, we should increase the calibration set size or implement cross-conformal prediction methods tailored for power-law distributions."
-            )
+        coverage = validation_report.get("conformal", {}).get("test_coverage")
+        st.metric(label="Empirical Coverage", value=f"{coverage:.1%}" if coverage is not None else "Not measured")
+        with st.expander("How are the intervals evaluated?"):
+            st.write("Models use training customers only. The absolute-error quantile is fitted on separate calibration customers, then coverage is measured on untouched test customers. This is a single-period customer split, not a future-period backtest; distribution changes can invalidate exchangeability.")
             
         st.markdown("#### Feature Stability")
         if not psi_data.empty:

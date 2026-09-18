@@ -39,7 +39,7 @@ class DataPreprocessor:
     8. Cap outliers
     """
     
-    def __init__(self, convert_to_inr: bool = True):
+    def __init__(self, convert_to_inr: bool = True, cap_outliers: bool = False):
         """
         Parameters
         ----------
@@ -47,6 +47,7 @@ class DataPreprocessor:
             If True, convert GBP prices to INR.
         """
         self.convert_to_inr = convert_to_inr
+        self.cap_outliers = cap_outliers
         self.cleaning_report = {}
     
     def clean(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -108,7 +109,8 @@ class DataPreprocessor:
         
         # Step 8: Cap extreme outliers on TotalPrice
         rows_before = len(df)
-        upper_cap = df[COL_TOTAL_PRICE].quantile(OUTLIER_PERCENTILE / 100)
+        reference = df.loc[df[COL_DATE] < OBSERVATION_END, COL_TOTAL_PRICE]
+        upper_cap = reference.quantile(OUTLIER_PERCENTILE / 100) if self.cap_outliers else float("inf")
         df = df[df[COL_TOTAL_PRICE] <= upper_cap]
         self._log_step("cap_outliers", rows_before, len(df))
         
@@ -151,12 +153,12 @@ class DataPreprocessor:
         """
         observation_df = df[
             (df[COL_DATE] >= OBSERVATION_START) & 
-            (df[COL_DATE] <= OBSERVATION_END)
+            (df[COL_DATE] < OBSERVATION_END)
         ].copy()
         
         holdout_df = df[
             (df[COL_DATE] >= HOLDOUT_START) & 
-            (df[COL_DATE] <= HOLDOUT_END)
+            (df[COL_DATE] < HOLDOUT_END)
         ].copy()
         
         logger.info(f"Observation window: {OBSERVATION_START.date()} to {OBSERVATION_END.date()}")

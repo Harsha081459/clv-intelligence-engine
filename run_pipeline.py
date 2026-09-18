@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import json
 import logging
 import sys
 import time
@@ -24,11 +25,12 @@ from src.config import (
     RAW_DATA_FILE, CLEAN_TRANSACTIONS_FILE, CUSTOMER_FEATURES_FILE,
     RFM_SUMMARY_FILE, CLV_PREDICTIONS_FILE, CUSTOMER_SEGMENTS_FILE,
     OUTPUT_DATA_DIR, MODELS_DIR, PROCESSED_DATA_DIR,
-    OBSERVATION_END, HOLDOUT_END, GROSS_MARGIN,
+    OBSERVATION_END, HOLDOUT_START, HOLDOUT_END, GROSS_MARGIN,
     CLV_PREDICTION_MONTHS, MONTHLY_DISCOUNT_RATE,
     COST_PER_CONTACT_INR, RANDOM_STATE, CURRENCY_SYMBOL,
     CONFORMAL_ALPHA
 )
+from src.models.validation import customer_splits, out_of_fold_predictions, conformal_radius, split_labels
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,6 +59,7 @@ def run_data_pipeline():
     preprocessor = DataPreprocessor(convert_to_inr=True)
     clean_df = preprocessor.clean(raw_df)
     preprocessor.save_clean_data(clean_df)
+    (OUTPUT_DATA_DIR / "data_summary.json").write_text(json.dumps(preprocessor.get_cleaning_report(), indent=2), encoding="utf-8")
     
     # Temporal split
     obs_df, holdout_df = preprocessor.temporal_split(clean_df)
@@ -107,10 +110,16 @@ def run_probabilistic_models(rfm=None, holdout_actuals=None):
     
     # Fit probabilistic models
     prob_model = ProbabilisticCLV()
-    prob_model.fit(rfm)
+    split = customer_splits(rfm.index, RANDOM_STATE)
+    prob_model.fit(rfm.loc[split["train"]])
     
     # Predict
-    predictions = prob_model.predict_all(rfm, months=CLV_PREDICTION_MONTHS)
+    horizon = (HOLDOUT_END - HOLDOUT_START).days
+    predictions = pd.DataFrame(index=rfm.index)
+    predictions["predicted_purchases"] = prob_model.predict_purchases(rfm, t=horizon)
+    predictions["p_alive"] = prob_model.predict_alive_probability(rfm)
+    predictions["predicted_clv"] = prob_model.predict_revenue(rfm, days=horizon)
+    predictions["clv_inr"] = predictions["predicted_clv"]
     
     # Validate against holdout
     common_customers = predictions.index.intersection(holdout_actuals.index)
@@ -135,7 +144,7 @@ def run_probabilistic_models(rfm=None, holdout_actuals=None):
     return prob_model, predictions
 
 
-def run_ml_models(features=None, predictions_prob=None, holdout_actuals=None):
+def run_ml_models(features=None, predictions_prob=None, holdout_actuals=None, n_trials=5):
     """Phase 3: Train LightGBM + stacking."""
     import pandas as pd
     import numpy as np
@@ -175,16 +184,23 @@ def run_ml_models(features=None, predictions_prob=None, holdout_actuals=None):
     # Train LightGBM
     lgbm_model = CLVBoostingModel(model_type='lightgbm')
     logger.info("Tuning LightGBM hyperparameters with Optuna...")
-    best_params = lgbm_model.tune_hyperparameters(X, y, n_trials=30)
-    lgbm_model.train(X, y, params=best_params)
-    lgbm_predictions = lgbm_model.predict(X)
+    split = customer_splits(X.index, RANDOM_STATE)
+    X_train, y_train = X.loc[split["train"]], y.loc[split["train"]]
+    best_params = lgbm_model.tune_hyperparameters(X_train, y_train, n_trials=n_trials)
+    best_params["n_jobs"] = 2
+    oof_predictions = out_of_fold_predictions(lgbm_model._build_estimator(best_params), X_train, y_train)
+    lgbm_model.train(X_train, y_train, params=best_params)
+    lgbm_predictions = np.maximum(lgbm_model.predict(X), 0)
     
     # Train stacking model
     bgf_pred = predictions_prob.reindex(ml_features.index)['predicted_clv'].fillna(0).values
     
     stacked_model = StackedCLVModel()
-    stacked_model.fit(X, y, bgf_pred, lgbm_predictions)
-    stacked_predictions = stacked_model.predict(bgf_pred, lgbm_predictions)
+    bgf_train = pd.Series(bgf_pred, index=X.index).loc[split["train"]].to_numpy()
+    stacked_model.fit(X_train, y_train, bgf_train, oof_predictions)
+    stacked_predictions = np.maximum(stacked_model.predict(bgf_pred, lgbm_predictions), 0)
+    test_positions = X.index.get_indexer(split["test"])
+    y_test = y.loc[split["test"]]
     
     # Compare models
     logger.info(f"\n{'='*60}")
@@ -193,11 +209,12 @@ def run_ml_models(features=None, predictions_prob=None, holdout_actuals=None):
     
     results = {}
     for name, pred in [('BG/NBD', bgf_pred), ('LightGBM', lgbm_predictions), ('Stacked', stacked_predictions)]:
+        test_pred = np.asarray(pred)[test_positions]
         results[name] = {
-            'MAE': mae(y, pred),
-            'RMSE': rmse(y, pred),
-            'MAPE': mape(y, pred),
-            'Pearson_r': pearson_correlation(y, pred),
+            'MAE': mae(y_test, test_pred),
+            'RMSE': rmse(y_test, test_pred),
+            'MAPE': mape(y_test, test_pred),
+            'Pearson_r': pearson_correlation(y_test, test_pred),
         }
         logger.info(f"  {name:12s}: MAE={CURRENCY_SYMBOL}{results[name]['MAE']:,.0f}, "
                     f"RMSE={CURRENCY_SYMBOL}{results[name]['RMSE']:,.0f}, "
@@ -207,6 +224,18 @@ def run_ml_models(features=None, predictions_prob=None, holdout_actuals=None):
     # Save comparison
     comparison_df = pd.DataFrame(results).T
     comparison_df.to_parquet(OUTPUT_DATA_DIR / "model_comparison.parquet")
+    report = {
+        "protocol": "customer-heldout-v1", "seed": RANDOM_STATE,
+        "target": "positive non-cancelled purchase revenue in INR; not discounted profit",
+        "observation_end_exclusive": OBSERVATION_END.isoformat(),
+        "target_start": HOLDOUT_START.isoformat(), "target_end_exclusive": HOLDOUT_END.isoformat(),
+        "splits": {name: ids.tolist() for name, ids in split.items()},
+        "optuna_trials": n_trials, "models": results,
+        "data_summary": json.loads((OUTPUT_DATA_DIR / 'data_summary.json').read_text(encoding='utf-8')) if (OUTPUT_DATA_DIR / 'data_summary.json').exists() else {},
+        "best_parameters": best_params,
+        "caveats": ["Customer holdout within one target year, not a rolling future-time backtest", "Uplift outcomes are simulated", "Legacy 43.6% MAE improvement and 0.9902 correlation were in-sample and are superseded"],
+    }
+    (OUTPUT_DATA_DIR / "validation_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     
     # Save best predictions
     final_predictions = pd.DataFrame({
@@ -216,6 +245,12 @@ def run_ml_models(features=None, predictions_prob=None, holdout_actuals=None):
         'p_alive': predictions_prob.reindex(ml_features.index)['p_alive'].fillna(0).values,
     }, index=ml_features.index)
     
+    final_predictions["validation_split"] = split_labels(X.index, split)
+    final_predictions.to_parquet(CLV_PREDICTIONS_FILE)
+    evaluation = final_predictions.loc[split["test"]].copy()
+    evaluation["actual_revenue"] = y_test
+    evaluation.to_parquet(OUTPUT_DATA_DIR / "evaluation_predictions.parquet")
+
     # SHAP values
     logger.info("Computing SHAP values...")
     try:
@@ -334,14 +369,11 @@ def run_conformal_prediction(features=None, holdout_actuals=None, final_predicti
     """Phase 6: Conformal prediction intervals."""
     import pandas as pd
     import numpy as np
-    from sklearn.model_selection import train_test_split
     
     logger.info("=" * 60)
     logger.info("PHASE 6: CONFORMAL PREDICTION INTERVALS")
     logger.info("=" * 60)
     
-    from src.monitoring.conformal import ConformalCLVPredictor
-    from src.evaluation.metrics import mae
     
     if features is None:
         features = pd.read_parquet(CUSTOMER_FEATURES_FILE)
@@ -351,67 +383,35 @@ def run_conformal_prediction(features=None, holdout_actuals=None, final_predicti
         final_predictions = pd.read_parquet(CLV_PREDICTIONS_FILE)
     
     # Prepare data
-    common = features.index.intersection(holdout_actuals.index)
-    
-    prob_preds = final_predictions.reindex(features.index)
-    exclude_cols = ['cohort_month', 'cohort_index']
-    feature_cols = [c for c in features.columns if c not in exclude_cols]
-    
-    X_all = features.loc[common, feature_cols].fillna(0)
+    actual = holdout_actuals.reindex(final_predictions.index)['holdout_revenue'].fillna(0)
     # Add probabilistic features
-    for col in ['p_alive', 'predicted_clv_bgnbd', 'predicted_clv_lgbm']:
-        if col in prob_preds.columns:
-            X_all[col] = prob_preds.reindex(common)[col].fillna(0)
-    
-    y_all = holdout_actuals.loc[common, 'holdout_revenue']
-    
-    X_np = X_all.values
-    y_np = y_all.values
-    
+    predictions = final_predictions['predicted_clv']
     # Split into train, calibration, test
-    X_train, X_temp, y_train, y_temp = train_test_split(
-        X_np, y_np, test_size=0.4, random_state=RANDOM_STATE
-    )
-    X_calib, X_test, y_calib, y_test = train_test_split(
-        X_temp, y_temp, test_size=0.5, random_state=RANDOM_STATE
-    )
-    
+    split = customer_splits(final_predictions.index, RANDOM_STATE)
+    if 'validation_split' not in final_predictions or not final_predictions['validation_split'].equals(split_labels(final_predictions.index, split)):
+        raise ValueError("Run the corrected ML phase before calibration")
     # Fit conformal model
-    from lightgbm import LGBMRegressor
-    base_model = LGBMRegressor(
-        n_estimators=200, learning_rate=0.05, num_leaves=31,
-        random_state=RANDOM_STATE, verbosity=-1,
-    )
-    
-    conformal = ConformalCLVPredictor(base_model, alpha=CONFORMAL_ALPHA)
-    conformal.fit_and_conformalize(X_train, y_train, X_calib, y_calib)
-    
+    radius = conformal_radius(actual.loc[split['calibration']], predictions.loc[split['calibration']], CONFORMAL_ALPHA)
     # Evaluate
-    metrics = conformal.evaluate_coverage(y_test, X_test)
-    
+    lower = (predictions - radius).clip(lower=0)
+    upper = predictions + radius
+    test_ids = split['test']
+    coverage = float(((actual.loc[test_ids] >= lower.loc[test_ids]) & (actual.loc[test_ids] <= upper.loc[test_ids])).mean())
     # Predict for all customers
-    X_full = features[feature_cols].fillna(0)
-    for col in ['p_alive', 'predicted_clv_bgnbd', 'predicted_clv_lgbm']:
-        if col in prob_preds.columns:
-            X_full[col] = prob_preds.reindex(features.index)[col].fillna(0)
-    
-    result = conformal.predict_with_labels(X_full.values, customer_ids=features.index)
-    
+    result = pd.DataFrame({'clv_lower': lower, 'clv_upper': upper, 'interval_width': upper - lower})
     # Merge with existing predictions
-    if final_predictions is not None:
-        for col in ['clv_lower', 'clv_upper', 'interval_width']:
-            if col in result.columns:
-                final_predictions[col] = result[col]
-    
+    for column in result:
+        final_predictions[column] = result[column]
     # Save
     final_predictions.to_parquet(CLV_PREDICTIONS_FILE)
-    conformal.save()
-    
+    report_path = OUTPUT_DATA_DIR / 'validation_report.json'
+    report = json.loads(report_path.read_text(encoding='utf-8'))
+    report['conformal'] = {'alpha': CONFORMAL_ALPHA, 'radius_inr': radius, 'test_coverage': coverage,
+                           'test_mean_width_inr': float((upper - lower).loc[test_ids].mean())}
+    report_path.write_text(json.dumps(report, indent=2), encoding='utf-8')
     logger.info("Conformal prediction complete!")
-    logger.info(f"  Coverage: {metrics['empirical_coverage']:.1%}")
-    logger.info(f"  Avg interval: {CURRENCY_SYMBOL}{metrics['avg_interval_width']:,.0f}")
-    
-    return conformal, final_predictions
+    logger.info("  Independent test coverage: %.1f%%", 100 * coverage)
+    return radius, final_predictions
 
 
 def run_drift_monitoring(clean_df=None):
@@ -493,7 +493,7 @@ def run_drift_monitoring(clean_df=None):
     logger.info("Drift monitoring complete!")
 
 
-def run_all():
+def run_all(n_trials=5):
     """Run the complete pipeline."""
     start_time = time.time()
     
@@ -508,7 +508,7 @@ def run_all():
     
     # Phase 3: ML models
     lgbm_model, stacked_model, final_predictions, feature_names = run_ml_models(
-        features, prob_predictions, holdout_actuals
+        features, prob_predictions, holdout_actuals, n_trials=n_trials
     )
     
     # Save final predictions
@@ -549,16 +549,19 @@ def main():
         help="Which phase to run (default: all)"
     )
     
+    parser.add_argument("--trials", type=int, default=5, help="Optuna trials using training customers only")
     args = parser.parse_args()
+    if args.trials < 1:
+        parser.error("--trials must be positive")
     
     if args.phase == "all":
-        run_all()
+        run_all(n_trials=args.trials)
     elif args.phase == "data":
         run_data_pipeline()
     elif args.phase == "probabilistic":
         run_probabilistic_models()
     elif args.phase == "ml":
-        run_ml_models()
+        run_ml_models(n_trials=args.trials)
     elif args.phase == "segmentation":
         run_segmentation()
     elif args.phase == "uplift":

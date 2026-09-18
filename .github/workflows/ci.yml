@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'verify/**']
+  pull_request:
+    branches: [main, 'verify/**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check . --select E9,F63,F7,F82
+
+      - name: Test
+        run: python -m pytest -q
+
+  retail-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: python download_data.py
+      - run: python run_pipeline.py --phase all --trials 5
+      - run: python -m pytest tests/test_dashboard.py -q
+        env:
+          CLV_INTEGRATION: "1"
+      - name: Publish reproducible validation outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clv-validation
+          path: |
+            data/output/validation_report.json
+            data/output/data_summary.json
+            data/output/model_comparison.parquet
+            data/output/evaluation_predictions.parquet
